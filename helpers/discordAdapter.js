@@ -16,7 +16,7 @@ function createDiscordMsg(message, body, sender, pushName, guildId) {
     // chat object (mirip WA)
     const chat = {
         id: { _serialized: guildId },
-        isGroup,
+        isGroup:  true,              // selalu true di Discord
         sendMessage: async (content) => {
             if (typeof content === 'string') {
                 await message.channel.send(content);
@@ -31,11 +31,11 @@ function createDiscordMsg(message, body, sender, pushName, guildId) {
 
     const msg = {
         body,
-        from:     guildId,
+        from:     guildId + '@g.us',
         author:   sender,
         pushName,
         hasMedia: false,
-        isGroup,
+        isGroup:  true,              // selalu true di Discord
         type:     'text',
         platform: 'discord', // identifier platform
 
