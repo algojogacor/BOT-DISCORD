@@ -6,6 +6,7 @@
 const { Client, GatewayIntentBits, Partials, EmbedBuilder, ActivityType } = require('discord.js');
 const { connectToCloud, loadDB, saveDB, addQuestProgress } = require('./helpers/database');
 const { createDiscordMsg } = require('./helpers/discordAdapter');
+const setupCmd = require('./commands/discord/setup');
 
 // ─── IMPORT COMMANDS (sama persis dengan WA) ──────────────────────────────
 const bankCmd        = require('./commands/bank');
@@ -208,6 +209,8 @@ client.on('messageCreate', async (message) => {
         .catch(e => console.error('[Roulette]', e.message));
     await battleCmd(command, args, msg, user, db)
         .catch(e => console.error('[Battle]', e.message));
+        await setupCmd(command, args, msg, user, db, client)
+    .catch(e => console.error('[Setup]', e.message));
     await duelCmd(command, args, msg, user, db)
         .catch(e => console.error('[Duel]', e.message));
     await bolaCmd(command, args, msg, user, db, sender)
