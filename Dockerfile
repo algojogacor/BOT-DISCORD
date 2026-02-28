@@ -19,21 +19,30 @@ RUN pip3 install pillow --break-system-packages
 # 3. Set working directory
 WORKDIR /app
 
-# 4. PERBAIKAN: Copy package.json dari ROOT (folder utama), BUKAN dari commands
+# 4. Copy package.json
 COPY package*.json ./
 
-# 5. Install Node.js dependencies
-# Menggunakan --omit=dev agar lebih ringan dan cepat
+# 5. Install dependencies (termasuk concurrently)
 RUN npm install --omit=dev
 
 # 6. Copy semua file bot
 COPY . .
 
-# 7. Buat direktori penting (pastikan session ada agar tidak minta scan ulang terus)
-RUN mkdir -p session temp helpers
+# 7. Buat direktori penting
+RUN mkdir -p auth_baileys temp helpers
 
-# Expose port untuk health check Koyeb/Railway
+# Expose port
 EXPOSE 3000
 
-# 8. Jalankan bot
-CMD ["node", "index.js"]
+# 8. Jalankan KEDUA bot sekaligus
+CMD ["npx", "concurrently", "node index.js", "node discord-index.js"]
+```git 
+
+**Tambahkan juga `.dockerignore`** di folder project:
+```
+node_modules/
+.env
+auth_baileys/
+*.log
+temp/
+.git/
