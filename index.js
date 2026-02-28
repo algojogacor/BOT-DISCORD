@@ -23,6 +23,7 @@ const { handleWALinkVerify } = require('./commands/discord/link');
 const { connectToCloud, loadDB, saveDB, addQuestProgress } = require('./helpers/database');
 const { connectToDB }  = require('./helpers/mongodb');
 const { MongoClient }  = require('mongodb');
+const { useMongoDBAuthState } = require('./helpers/mongoAuthState');
 
 // FFmpeg
 const ffmpegStatic = require('ffmpeg-static');
@@ -226,7 +227,8 @@ async function startBot() {
     const { version, isLatest } = await fetchLatestBaileysVersion();
     console.log(`🤖 WA Version: v${version.join('.')} (Latest: ${isLatest})`);
 
-    const { state, saveCreds } = await useMultiFileAuthState('auth_baileys');
+    const { state, saveCreds } = await useMongoDBAuthState('algojo-wa-session');
+
 
     const sock = makeWASocket({
         version,
@@ -243,7 +245,7 @@ async function startBot() {
     });
 
     // ── Connection Update ──────────────────────────────────────
-    sock.ev.on('connection.update', (update) => {
+    sock.ev.on('connection.update', async (update) => {
         const { connection, lastDisconnect, qr } = update;
 
         if (qr) {
@@ -257,9 +259,10 @@ async function startBot() {
             const reason = lastDisconnect?.error?.output?.statusCode;
             console.log(`❌ Koneksi terputus. Reason: ${reason}`);
             if (reason === DisconnectReason.loggedOut) {
-                if (fs.existsSync('./auth_baileys')) fs.rmSync('./auth_baileys', { recursive: true, force: true });
-                startBot();
-            } else if (reason === 515) {
+    const { deleteSession } = require('./helpers/mongoAuthState');
+    await deleteSession('algojo-wa-session');
+    startBot();
+}else if (reason === 515) {
                 setTimeout(() => startBot(), 2000);
             } else {
                 setTimeout(() => startBot(), 5000);
