@@ -36,13 +36,3 @@ EXPOSE 3000
 
 # 8. Jalankan KEDUA bot sekaligus
 CMD ["npx", "concurrently", "node index.js", "node discord-index.js"]
-```git 
-
-**Tambahkan juga `.dockerignore`** di folder project:
-```
-node_modules/
-.env
-auth_baileys/
-*.log
-temp/
-.git/
