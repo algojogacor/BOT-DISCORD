@@ -295,6 +295,7 @@ async function startDiscordBot() {
         global.db = await loadDB();
         if (!global.db.users)        global.db.users        = {};
         if (!global.db.groups)       global.db.groups       = {};
+        if (!global.db.usedGameCodes) global.db.usedGameCodes = {};
         if (!global.db.market)       global.db.market       = { commodities: {} };
         if (!global.db.settings)     global.db.settings     = {};
         if (!global.db.reminders)    global.db.reminders    = {};

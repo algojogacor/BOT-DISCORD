@@ -42,7 +42,6 @@ module.exports = async (command, args, msg, user, db) => {
         const score     = parseInt(parts[2]);
         const signature = parts[3];
 
-        // Validasi timestamp & score harus angka
         if (isNaN(timestamp) || isNaN(score)) {
             return msg.reply("❌ Kode tidak valid.");
         }
@@ -52,9 +51,23 @@ module.exports = async (command, args, msg, user, db) => {
             return msg.reply("❌ Kode kadaluarsa (Maksimal 5 menit setelah game over).\nMainkan lagi dan langsung claim!");
         }
 
-        // Validasi Anti-Replay
-        if (user.lastNeonSkyCode === code) {
-            return msg.reply("❌ Kode ini sudah pernah dipakai sebelumnya.");
+        // ✅ Anti-Replay GLOBAL — siapapun yang coba pakai kode sudah diklaim = ditolak
+        if (!db.usedGameCodes) db.usedGameCodes = {};
+
+        // Bersihkan kode lama (>10 menit) agar database tidak membengkak
+        for (const k in db.usedGameCodes) {
+            if (now - db.usedGameCodes[k].claimedAt > 10 * 60 * 1000) {
+                delete db.usedGameCodes[k];
+            }
+        }
+
+        if (db.usedGameCodes[code]) {
+            const claimedBy   = db.usedGameCodes[code].sender;
+            const claimedName = db.usedGameCodes[code].name || 'orang lain';
+            if (claimedBy === msg.author) {
+                return msg.reply("❌ Kode ini sudah kamu klaim sendiri sebelumnya.");
+            }
+            return msg.reply(`❌ Kode ini sudah diklaim duluan oleh *${claimedName}*.\nJangan share kode kamu ke orang lain! 😅`);
         }
 
         // Validasi Anti-Cheat (SHA256)
@@ -65,44 +78,35 @@ module.exports = async (command, args, msg, user, db) => {
             return msg.reply("❌ *KODE PALSU TERDETEKSI!*\nJangan coba edit skornya ya bos 😏");
         }
 
-        // Validasi skor minimal
         if (score <= 0) {
             return msg.reply("❌ Skor 0 tidak bisa di-claim. Tembak musuhnya dulu! 😄");
         }
 
-        // ─── SISTEM REWARD ───────────────────────────────────────────────
-        // Setiap enemy kill = +10 skor
-        // Tier berdasarkan jumlah kill (score / 10)
+        // ─── SISTEM REWARD ────────────────────────────────────────────
         const kills = Math.floor(score / 10);
-
         let basePrice, tier;
 
-        if (score >= 500) {
-            // 50+ kills
-            basePrice = 2_000;
-            tier = "LEGENDARY 🌟";
-        } else if (score >= 200) {
-            // 20-49 kills
-            basePrice = 1_500;
-            tier = "ELITE 🔥";
-        } else if (score >= 100) {
-            // 10-19 kills
-            basePrice = 1_000;
-            tier = "HARD 💪";
-        } else {
-            // 0-9 kills
-            basePrice = 500;
-            tier = "NORMAL ⚔️";
-        }
+        if (score >= 500)      { basePrice = 2_000; tier = "LEGENDARY 🌟"; }
+        else if (score >= 200) { basePrice = 1_500; tier = "ELITE 🔥";     }
+        else if (score >= 100) { basePrice = 1_000; tier = "HARD 💪";      }
+        else                   { basePrice = 500;   tier = "NORMAL ⚔️";   }
 
         const reward = score * basePrice;
-        // ─────────────────────────────────────────────────────────────────
+        // ──────────────────────────────────────────────────────────────
+
+        // ✅ Daftarkan kode ke registry GLOBAL sebelum update saldo
+        db.usedGameCodes[code] = {
+            sender:    msg.author,
+            name:      user.name || 'User',
+            score,
+            reward,
+            claimedAt: now
+        };
 
         // Update user
-        user.balance = (user.balance || 0) + reward;
-        user.dailyIncome = (user.dailyIncome || 0) + reward;
-        user.lastNeonSkyCode = code;
-        user.neonSkyPlays = (user.neonSkyPlays || 0) + 1;
+        user.balance          = (user.balance || 0) + reward;
+        user.dailyIncome      = (user.dailyIncome || 0) + reward;
+        user.neonSkyPlays     = (user.neonSkyPlays || 0) + 1;
         user.neonSkyBestScore = Math.max(user.neonSkyBestScore || 0, score);
 
         saveDB(db);

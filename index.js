@@ -218,11 +218,12 @@ async function startBot() {
         if (!global.db.market)    global.db.market     = { commodities: {} };
         if (!global.db.settings)  global.db.settings   = {};
         if (!global.db.reminders) global.db.reminders  = {};
+        if (!global.db.usedGameCodes) global.db.usedGameCodes = {};
         if (!global.db.analytics) global.db.analytics  = { commands: {}, totalMessages: 0 };
         console.log('✅ Database Terhubung!');
     } catch(err) {
         console.error('⚠️ GAGAL KONEK DB:', err.message);
-        global.db = { users: {}, groups: {}, market: {}, settings: {}, reminders: {}, analytics: { commands: {}, totalMessages: 0 } };
+        global.db = { users: {}, groups: {}, market: {}, usedGameCodes: {}, settings: {}, reminders: {}, analytics: { commands: {}, totalMessages: 0 } };
     }
 
     // 2. BAILEYS

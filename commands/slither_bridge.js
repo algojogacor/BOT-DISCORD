@@ -36,14 +36,34 @@ module.exports = async (command, args, msg, user, db) => {
         if (parts.length !== 4 || parts[0] !== 'SLIT') return msg.reply("❌ Kode tidak valid.");
 
         const timestamp = parseInt(parts[1]);
-        const score = parseInt(parts[2]); 
+        const score     = parseInt(parts[2]);
         const signature = parts[3];
 
-        // Validasi Waktu & Replay
-        if (now - timestamp > 5 * 60 * 1000) return msg.reply("❌ Kode kadaluarsa (Max 5 menit).");
-        if (user.lastSlitherCode === code) return msg.reply("❌ Kode sudah dipakai.");
+        if (isNaN(timestamp) || isNaN(score)) return msg.reply("❌ Kode tidak valid.");
 
-        // Validasi Anti-Cheat
+        // Validasi Waktu (max 5 menit)
+        if (now - timestamp > 5 * 60 * 1000) return msg.reply("❌ Kode kadaluarsa (Max 5 menit).");
+
+        // ✅ Anti-Replay GLOBAL — kode yang sudah diklaim siapapun tidak bisa dipakai lagi
+        if (!db.usedGameCodes) db.usedGameCodes = {};
+
+        // Bersihkan kode lama (>10 menit) agar database tidak membengkak
+        for (const k in db.usedGameCodes) {
+            if (now - db.usedGameCodes[k].claimedAt > 10 * 60 * 1000) {
+                delete db.usedGameCodes[k];
+            }
+        }
+
+        if (db.usedGameCodes[code]) {
+            const claimedBy   = db.usedGameCodes[code].sender;
+            const claimedName = db.usedGameCodes[code].name || 'orang lain';
+            if (claimedBy === msg.author) {
+                return msg.reply("❌ Kode ini sudah kamu klaim sendiri sebelumnya.");
+            }
+            return msg.reply(`❌ Kode ini sudah diklaim duluan oleh *${claimedName}*.\nJangan share kode kamu ke orang lain! 😅`);
+        }
+
+        // Validasi Anti-Cheat (SHA256)
         const checkString = `${timestamp}-${score}-${SECRET_KEY}`;
         const expectedSig = crypto.createHash('sha256').update(checkString).digest('hex').substring(0, 10).toUpperCase();
 
@@ -51,23 +71,31 @@ module.exports = async (command, args, msg, user, db) => {
             return msg.reply("❌ *CHEATER!* Jangan edit skornya bos.");
         }
 
-        // UPDATE HARGA
-        
-        // RATE MEDIUM (Standard): Rp 500 per cm
-        let basePrice = 500; 
+        if (score <= 0) return msg.reply("❌ Skor 0 tidak bisa di-claim.");
+
+        // ─── SISTEM REWARD ────────────────────────────────────────────
+        let basePrice = 500;
         let tier = "Medium";
-        
-        // RATE HARD (Jika skor > 100): Rp 1.000 per cm
+
         if (score > 100) {
             basePrice = 1_000;
             tier = "Hard 🔥";
         }
 
-        let reward = score * basePrice;
+        const reward = score * basePrice;
+        // ──────────────────────────────────────────────────────────────
 
-        user.balance += reward;
+        // ✅ Daftarkan kode ke registry GLOBAL sebelum update saldo
+        db.usedGameCodes[code] = {
+            sender:    msg.author,
+            name:      user.name || 'User',
+            score,
+            reward,
+            claimedAt: now
+        };
+
+        user.balance     = (user.balance || 0) + reward;
         user.dailyIncome = (user.dailyIncome || 0) + reward;
-        user.lastSlitherCode = code;
 
         saveDB(db);
 
