@@ -1,3 +1,4 @@
+const { tambahWindfall } = require('./pajak');
 const { saveDB, addQuestProgress } = require('../helpers/database');
 
 // DAFTAR ITEM DI TOKO
@@ -233,6 +234,7 @@ module.exports = async (command, args, msg, user, db) => {
 
         user.balance += reward;
         user.dailyIncome = (user.dailyIncome || 0) + reward;
+        tambahWindfall(user, reward);
         const qMsg = handleQuest(user, "game");
         
         saveDB(db);

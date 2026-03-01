@@ -1,4 +1,5 @@
 const { saveDB } = require('../helpers/database');
+const { tambahWindfall } = require('./pajak');
 const { updateLife, KONFIG_LIFE } = require('./life');
 
 // =================================================================

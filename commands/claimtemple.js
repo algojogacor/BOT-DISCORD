@@ -1,5 +1,6 @@
 const { saveDB } = require('../helpers/database');
 const crypto = require('crypto');
+const { tambahWindfall } = require('./pajak');
 
 const fmt = (num) => Math.floor(Number(num)).toLocaleString('id-ID');
 
@@ -84,6 +85,7 @@ module.exports = async (command, args, msg, user, db) => {
 
         user.balance          = (user.balance || 0) + reward;
         user.dailyIncome      = (user.dailyIncome || 0) + reward;
+        tambahWindfall(user, reward);
         user.templePlays      = (user.templePlays || 0) + 1;
         user.templeBestScore  = Math.max(user.templeBestScore || 0, score);
 

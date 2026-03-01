@@ -33,6 +33,8 @@ process.env.FFMPEG_PATH = ffmpegStatic;
 const timeMachineCmd = require('./commands/timemachine');
 const lifeCmd        = require('./commands/life');
 const bankCmd        = require('./commands/bank');
+const pajakCmd = require('./commands/pajak');
+const { initPajak, prosesDenda, generateTagihan, tambahIncome } = require('./commands/pajak');
 const adminAbuseCmd  = require('./commands/adminabuse');
 const jobsCmd        = require('./commands/jobs');
 const chartCmd       = require('./commands/chart');
@@ -459,11 +461,12 @@ async function startBot() {
 
             // Daily Reset
             if (user.quest?.lastReset !== today) {
-                user.quest.daily.forEach(q => { q.progress = 0; q.claimed = false; });
-                user.quest.lastReset = today;
-                user.dailyIncome = 0;
-                user.dailyUsage  = 0;
-            }
+    user.quest.daily.forEach(q => { q.progress = 0; q.claimed = false; });
+    user.quest.lastReset = today;
+    if (user.dailyIncome > 0) tambahIncome(user, user.dailyIncome); // ← TAMBAH INI
+    user.dailyIncome = 0;
+    user.dailyUsage  = 0;
+}
             if (user.buffs) {
                 for (const k in user.buffs)
                     if (user.buffs[k].active && Date.now() >= user.buffs[k].until)
@@ -536,6 +539,8 @@ async function startBot() {
             //           bayar, pay, rob, maling, top, leaderboard
             await bankCmd(command, args, msg, user, db, sock)
                 .catch(e => console.error('[Bank]', e.message));
+                await pajakCmd(command, args, msg, user, db)
+                .catch(e => console.error('[Pajak]', e.message));
 
             // ── Original Commands ──────────────────────────────
             await ternakCmd(command, args, msg, user, db)

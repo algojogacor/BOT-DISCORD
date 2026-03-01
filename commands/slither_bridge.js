@@ -1,3 +1,4 @@
+const { tambahWindfall } = require('./pajak');
 const { saveDB } = require('../helpers/database');
 const crypto = require('crypto');
 
@@ -96,6 +97,7 @@ module.exports = async (command, args, msg, user, db) => {
 
         user.balance     = (user.balance || 0) + reward;
         user.dailyIncome = (user.dailyIncome || 0) + reward;
+        tambahWindfall(user, reward);
 
         saveDB(db);
 

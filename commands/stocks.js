@@ -1,4 +1,5 @@
 const axios = require('axios');
+const { tambahCapitalGains, tambahIncome } = require('./pajak');
 const { saveDB } = require('../helpers/database');
 
 // HELPER FORMAT ANGKA
@@ -263,12 +264,29 @@ module.exports = async (command, args, msg, user, db, sock) => {
         const status = profit >= 0 ? '🟢 Cuan' : '🔴 Boncos';
 
         user.balance += net;
-        user.dailyIncome = (user.dailyIncome || 0) + net;
-        p.qty -= qty;
-        if (p.qty === 0) delete user.portfolio[ticker];
+user.dailyIncome = (user.dailyIncome || 0) + net;
 
-        saveDB(db);
-        return msg.reply(`✅ *SELL ORDER DONE*\nEmiten: ${ticker}\nVol: ${fmt(qty)} Lembar\nHarga: Rp ${fmt(price)}\n\n💰 Gross: Rp ${fmt(gross)}\n💸 Tax: Rp ${fmt(tax)}\n💵 *Net: Rp ${fmt(net)}*\n\n📊 P/L: ${status} Rp ${fmt(profit)} (${pct}%)`);
+// Pajak Capital Gains dari profit
+let pajakCG = 0;
+if (profit > 0) {
+    pajakCG = tambahCapitalGains(user, profit); // ← TAMBAH INI
+}
+
+p.qty -= qty;
+if (p.qty === 0) delete user.portfolio[ticker];
+
+saveDB(db);
+return msg.reply(
+    `✅ *SELL ORDER DONE*\n` +
+    `Emiten: ${ticker}\n` +
+    `Vol: ${fmt(qty)} Lembar\n` +
+    `Harga: Rp ${fmt(price)}\n\n` +
+    `💰 Gross: Rp ${fmt(gross)}\n` +
+    `💸 Tax: Rp ${fmt(tax)}\n` +
+    `💵 *Net: Rp ${fmt(net)}*\n\n` +
+    `📊 P/L: ${status} Rp ${fmt(profit)} (${pct}%)\n` +
+    (pajakCG > 0 ? `🧾 Capital Gains Tax: Rp ${fmt(pajakCG)} (10%)\n_Bayar via !bayarpajak_` : '')
+);
     }
 
     // 4. PORTO
@@ -326,9 +344,16 @@ module.exports = async (command, args, msg, user, db, sock) => {
         const amount = Math.floor(totalAsset * 0.01);
         user.balance += amount;
         user.dailyIncome = (user.dailyIncome || 0) + amount;
+        tambahIncome(user, amount);
         user.lastDividend = now;
         saveDB(db);
 
-        return msg.reply(`💸 *DIVIDEN CAIR*\nTotal Aset: Rp ${fmt(totalAsset)}\nYield: 1%\n💵 *Diterima: Rp ${fmt(amount)}*`);
+        return msg.reply(
+    `💸 *DIVIDEN CAIR*\n` +
+    `Total Aset: Rp ${fmt(totalAsset)}\n` +
+    `Yield: 1%\n` +
+    `💵 *Diterima: Rp ${fmt(amount)}*\n` +
+    `🧾 Masuk akumulasi PPh` // ← TAMBAH INI
+);
     }
 };

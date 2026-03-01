@@ -1,3 +1,4 @@
+const { tambahIncome } = require('./pajak');
 const { saveDB } = require('../helpers/database');
 
 // HELPER FORMAT ANGKA
@@ -8,22 +9,22 @@ const JOBS = {
     'petani': {
         role: "🌾 Petani Modern",
         cost: 10000000,      // Biaya: 10Juta
-        salary: 1000000,    // Gaji: 1 Juta / Jam
+        salary: 4000000,    // Gaji: 1 Juta / Jam
         cooldown: 60,       // Kerja tiap 60 menit
         desc: "Ahli bercocok tanam. Skill: Percepat panen tanaman!"
     },
     'peternak': {
         role: "🤠 Juragan Ternak",
         cost: 25000000,      // Biaya: 25 Juta
-        salary: 2500000,    // Gaji: 2.5 Juta / 2 Jam (1.25jt/jam)
-        cooldown: 120,      // Kerja tiap 2 Jam
+        salary: 600000,    // Gaji: 2.5 Juta / 2 Jam (1.25jt/jam)
+        cooldown: 30,      // Kerja tiap 2 Jam
         desc: "Pawang hewan. Skill: Bikin hewan langsung lapar (Cepat gemuk)!"
     },
     'polisi': {
         role: "👮 Polisi Siber",
         cost: 50000000,     // Biaya: 50 Juta
-        salary: 7500000,    // Gaji: 7.5 Juta / 4 Jam (1.875jt/jam)
-        cooldown: 240,      // Kerja tiap 4 Jam
+        salary: 20000000,    // Gaji: 7.5 Juta / 4 Jam (1.875jt/jam)
+        cooldown: 180,      // Kerja tiap 4 Jam
         desc: "Penegak hukum. Pasif: Kebal dari !rob (Maling) & Skill Razia."
     }
 };
@@ -122,6 +123,7 @@ module.exports = async (command, args, msg, user, db) => {
 
         user.balance += job.salary;
         user.dailyIncome = (user.dailyIncome || 0) + job.salary;
+        tambahIncome(user, gaji);
         user.lastWork = now;
         user.xp += 50; 
         

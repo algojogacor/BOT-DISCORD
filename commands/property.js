@@ -1,3 +1,4 @@
+const { tambahIncome } = require('./pajak');
 const { saveDB } = require('../helpers/database');
 
 // KONFIGURASI PROPERTI (TIER UMKM s/d CRAZY RICH)
@@ -175,6 +176,7 @@ module.exports = async (command, args, msg, user, db) => {
         if (collected > 0) {
             user.balance += collected;
             user.dailyIncome = (user.dailyIncome || 0) + collected;
+             tambahIncome(user, collected); 
             msg.reply(`💰 Mengambil uang di brankas dulu: Rp ${collected.toLocaleString('id-ID')}`);
         }
 
@@ -213,6 +215,7 @@ module.exports = async (command, args, msg, user, db) => {
 
         user.balance += totalRevenue;
         user.dailyIncome = (user.dailyIncome || 0) + totalRevenue;
+        tambahIncome(user, totalRevenue);
         user.business.lastCollect = now; 
         saveDB(db);
 
@@ -227,3 +230,4 @@ module.exports = async (command, args, msg, user, db) => {
         return msg.reply(res);
     }
 };
+module.exports.PROPERTIES = PROPERTIES;

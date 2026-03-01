@@ -1,5 +1,6 @@
 const { saveDB } = require('../helpers/database');
 const crypto = require('crypto');
+const { tambahWindfall } = require('./pajak');
 
 // HELPER
 const fmt = (num) => Math.floor(Number(num)).toLocaleString('id-ID');
@@ -106,6 +107,7 @@ module.exports = async (command, args, msg, user, db) => {
         // Update user
         user.balance          = (user.balance || 0) + reward;
         user.dailyIncome      = (user.dailyIncome || 0) + reward;
+        tambahWindfall(user, reward);
         user.neonSkyPlays     = (user.neonSkyPlays || 0) + 1;
         user.neonSkyBestScore = Math.max(user.neonSkyBestScore || 0, score);
 

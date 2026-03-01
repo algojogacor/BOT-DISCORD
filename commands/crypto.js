@@ -179,6 +179,7 @@ module.exports = async (command, args, msg, user, db) => {
         
         user.balance += net;
         user.dailyIncome = (user.dailyIncome || 0) + net;
+        tambahCapitalGains(user, net);
         saveDB(db);
 
         return msg.reply(`✅ *JUAL SUKSES*\nKoin: ${koin.toUpperCase()}\nHarga Real: Rp ${fmt(currentPrice)}\nJual: ${amount.toFixed(8)}\n\n💰 Gross: Rp ${fmt(gross)}\n💸 Tax (${taxRate*100}%): Rp ${fmt(tax)}\n💵 *Terima: Rp ${fmt(net)}*`);
