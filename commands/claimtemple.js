@@ -14,7 +14,7 @@ module.exports = async (command, args, msg, user, db) => {
 
     // 1. LINK GAME
     if (command === 'temple') {
-        const GAME_LINK = "https://ISI_LINK_GAME_KAMU.netlify.app/";
+        const GAME_LINK = "https://templerunwa.netlify.app/";
         let txt = `🏛️ *TEMPLE DASH* 🏛️\n\n`;
         txt += `Mode: *Endless Runner*\n`;
         txt += `Lari, lompat, hindari jebakan!\n`;
