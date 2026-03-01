@@ -21,7 +21,7 @@ const KONFIG_LIFE = {
     SLEEP_DECAY_LAPAR:  0.025,  // Lapar turun sangat lambat saat tidur
 
     // BIAYA & DENDA
-    BIAYA_MAKAN:  50000000,
+    BIAYA_MAKAN:  5000000,
     BIAYA_RS:     500000000,
     DENDA_MATI:   0.2,
 
