@@ -39,6 +39,7 @@ const chartCmd       = require('./commands/chart');
 const economyCmd    = require('./commands/economy');
 const propertyCmd    = require('./commands/property');
 const pabrikCommand  = require('./commands/pabrik');
+const templeCmd = require('./commands/claimtemple');
 const valasCmd       = require('./commands/valas');
 const stocksCmd      = require('./commands/stocks');
 const farmingCmd     = require('./commands/farming');
@@ -549,6 +550,8 @@ async function startBot() {
                 .catch(e => console.error('[Dev]', e.message));
             await pabrikCommand(command, args, msg, user, db, sock)
                 .catch(e => console.error('[Pabrik]', e.message));
+                await templeCmd(command, args, msg, user, db)
+                .catch(e => console.error('[Temple]', e.message));
             await chartCmd(command, args, msg, user, db, sock)
                 .catch(e => console.error('[Chart]', e.message));
             await stocksCmd(command, args, msg, user, db, sock)
