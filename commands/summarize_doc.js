@@ -1,44 +1,35 @@
 /**
  * SUMMARIZE DOC v1.0 — Ringkas otomatis file PDF & Word (.docx)
- * Mendukung: Discord (attachment) & WhatsApp (document message)
+ * AI: Railway g4f (GPT-4o) — tanpa OpenRouter
  *
  * Commands:
  *   !ringkasdoc   — Kirim file PDF/DOCX lalu ketik !ringkasdoc
  *   !summarizedoc — Alias bahasa Inggris
  *   !analisisdok  — Mode analisis mendalam
- *
- * Cara pakai:
- *   Discord  : Upload file PDF/DOCX, lalu ketik !ringkasdoc di pesan yang sama
- *              ATAU reply pesan yang berisi file + ketik !ringkasdoc
- *   WhatsApp : Kirim dokumen PDF/DOCX, lalu reply + !ringkasdoc
  */
 
 require('dotenv').config();
-const axios  = require('axios');
-const OpenAI = require('openai');
+const axios = require('axios');
 
-// ─── AI Client ────────────────────────────────────────────────────────────────
-const client = new OpenAI({
-    baseURL: 'https://openrouter.ai/api/v1',
-    apiKey: process.env.OPENROUTER_API_KEY,
-    defaultHeaders: {
-        'HTTP-Referer': 'https://wa-bot.com',
-        'X-Title': 'Algojo Bot Document Summarizer',
-    },
-});
+// ─── Railway API URL ───────────────────────────────────────────────────────────
+// Set di .env: RAILWAY_API_URL=https://your-app.up.railway.app
+const RAILWAY_URL = process.env.RAILWAY_API_URL;
 
-// ─── Helper: Tanya AI ─────────────────────────────────────────────────────────
+// ─── Helper: Tanya AI via Railway ─────────────────────────────────────────────
 async function tanyaAI(userMsg, sysMsg = '') {
-    const msgs = [];
-    if (sysMsg) msgs.push({ role: 'system', content: sysMsg });
-    msgs.push({ role: 'user', content: userMsg });
+    if (!RAILWAY_URL) throw new Error('RAILWAY_API_URL belum diset di .env!');
 
-    const res = await client.chat.completions.create({
-        model: 'google/gemini-2.5-flash',
-        messages: msgs,
-        max_tokens: 3000,
-    });
-    return res.choices[0]?.message?.content || 'Tidak ada respons AI.';
+    const res = await axios.post(
+        `${RAILWAY_URL}/chat`,
+        {
+            system: sysMsg,
+            messages: [{ role: 'user', content: userMsg }],
+        },
+        { timeout: 60000 }
+    );
+
+    if (res.data?.error) throw new Error(res.data.error);
+    return res.data?.reply || 'Tidak ada respons AI.';
 }
 
 // ─── Helper: Download file dari URL ──────────────────────────────────────────
@@ -77,24 +68,29 @@ async function extractDocxText(buffer) {
 function detectFileType(filename = '', contentType = '') {
     const name = filename.toLowerCase();
     const mime = contentType.toLowerCase();
-
-    if (name.endsWith('.pdf') || mime.includes('pdf'))                      return 'pdf';
-    if (name.endsWith('.docx') || mime.includes('wordprocessingml'))        return 'docx';
-    if (name.endsWith('.doc')  || mime.includes('msword'))                  return 'doc';
+    if (name.endsWith('.pdf') || mime.includes('pdf'))               return 'pdf';
+    if (name.endsWith('.docx') || mime.includes('wordprocessingml')) return 'docx';
+    if (name.endsWith('.doc')  || mime.includes('msword'))           return 'doc';
     return null;
 }
 
 // ─── Helper: Ambil attachment Discord ────────────────────────────────────────
-function getDiscordAttachment(discordMessage) {
+async function getDiscordAttachment(discordMessage) {
     if (!discordMessage) return null;
 
-    // Cek attachment di pesan saat ini
-    const att = discordMessage.attachments?.first?.();
+    // Attachment di pesan saat ini
+    let att = discordMessage.attachments?.first?.();
     if (att) return att;
 
-    // Cek attachment di pesan yang di-reply
-    const ref = discordMessage.reference;
-    // (akan di-fetch di main handler)
+    // Attachment dari pesan yang di-reply
+    if (discordMessage.reference?.messageId) {
+        try {
+            const refMsg = await discordMessage.channel.messages.fetch(discordMessage.reference.messageId);
+            att = refMsg.attachments?.first?.();
+            if (att) return att;
+        } catch (_) {}
+    }
+
     return null;
 }
 
@@ -121,23 +117,20 @@ async function getWADocument(m) {
 
         if (quoted?.documentMessage) {
             return {
-                buffer:   await downloadMediaMessage(
-                    {
-                        key:     m.message.extendedTextMessage.contextInfo.stanzaId,
-                        message: quoted,
-                    },
+                buffer: await downloadMediaMessage(
+                    { key: m.message.extendedTextMessage.contextInfo.stanzaId, message: quoted },
                     'buffer', {}, { logger: SL }
                 ),
                 filename: quoted.documentMessage?.fileName || 'document',
                 mime:     quoted.documentMessage?.mimetype || '',
             };
         }
-    } catch (e) { /* ignore */ }
+    } catch (_) {}
     return null;
 }
 
 // ─── Sistem Prompt AI ─────────────────────────────────────────────────────────
-const SYSTEM_RINGKAS = `Kamu adalah asisten ahli meringkas dokumen. 
+const SYSTEM_RINGKAS = `Kamu adalah asisten ahli meringkas dokumen.
 Tugas: Buat ringkasan komprehensif dokumen yang diberikan dalam Bahasa Indonesia.
 
 Format output WAJIB:
@@ -160,7 +153,7 @@ Format output WAJIB:
 [kesimpulan singkat dan padat]
 ━━━━━━━━━━━━━━━━`;
 
-const SYSTEM_ANALISIS = `Kamu adalah analis dokumen profesional. 
+const SYSTEM_ANALISIS = `Kamu adalah analis dokumen profesional.
 Lakukan analisis mendalam dokumen dalam Bahasa Indonesia.
 
 Format output WAJIB:
@@ -209,16 +202,7 @@ module.exports = async (command, args, msg, user, db, sock, m) => {
     // ── 1. Coba ambil dari Discord attachment ──────────────────────────────
     const discordRaw = msg?._discordMessage;
     if (discordRaw) {
-        // Attachment di pesan saat ini
-        let att = discordRaw.attachments?.first?.();
-
-        // Attachment dari pesan yang di-reply
-        if (!att && discordRaw.reference?.messageId) {
-            try {
-                const refMsg = await discordRaw.channel.messages.fetch(discordRaw.reference.messageId);
-                att = refMsg.attachments?.first?.();
-            } catch (_) {}
-        }
+        const att = await getDiscordAttachment(discordRaw);
 
         if (att) {
             const ftype = detectFileType(att.name, att.contentType || '');
@@ -316,11 +300,13 @@ module.exports = async (command, args, msg, user, db, sock, m) => {
         truncated = true;
     }
 
-    // ── 6. Kirim ke AI untuk diringkas ────────────────────────────────────
+    // ── 6. Kirim ke Railway AI untuk diringkas ────────────────────────────
     try {
-        const wordCount  = extractedText.split(/\s+/).length;
-        const charCount  = extractedText.length;
-        const truncNote  = truncated ? '\n\n⚠️ _Dokumen sangat panjang. Hanya 12.000 karakter pertama yang diproses._' : '';
+        const wordCount = extractedText.split(/\s+/).length;
+        const charCount = extractedText.length;
+        const truncNote = truncated
+            ? '\n\n⚠️ _Dokumen sangat panjang. Hanya 12.000 karakter pertama yang diproses._'
+            : '';
 
         await msg.reply(`${emoji} *Menganalisis ${wordCount.toLocaleString()} kata...*`);
 
@@ -331,7 +317,7 @@ module.exports = async (command, args, msg, user, db, sock, m) => {
 
         const finalReply =
             `📁 *File:* ${filename}\n` +
-            `📊 *Statistik:* ${wordCount.toLocaleString()} kata | ${charCount.toLocaleString()} karakter\n` +
+            `📊 *Statistik:* ${wordCount.toLocaleString()} kata | ${charCount.toLocaleString()} karakter` +
             truncNote + '\n\n' +
             aiResult;
 
