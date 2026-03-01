@@ -1,6 +1,6 @@
 /**
  * ╔══════════════════════════════════════════════════════════════╗
- * ║         KREATIF TOOLS — Fitur 31, 33, 34, 35                ║
+ * ║        KREATIF TOOLS — Fitur 31, 33, 34, 35                ║
  * ║  !lirik <judul> <artis>  — Cari lirik + terjemahan          ║
  * ║  !meme <template> | <atas> | <bawah> — Buat meme            ║
  * ║  !voice <teks>           — AI TTS natural                   ║
@@ -15,6 +15,7 @@ const path = require('path');
 const { Readable } = require('stream');
 const RAILWAY_URL = process.env.RAILWAY_API_URL;
 
+// 👇 GUNAKAN TANYAAI YANG INI SAJA 👇
 async function tanyaAI(prompt, systemPrompt = '') {
     const res = await axios.post(`${RAILWAY_URL}/chat`, {
         system: systemPrompt,
@@ -24,25 +25,11 @@ async function tanyaAI(prompt, systemPrompt = '') {
     return res.data?.reply || '';
 }
 
-
 const TEMP_DIR = path.join(__dirname, '../temp');
 if (!fs.existsSync(TEMP_DIR)) fs.mkdirSync(TEMP_DIR, { recursive: true });
 
 // ─── Sesi cerita interaktif ───────────────────────────────────
 const sesiCerita = new Map();
-
-// ─── Helper: Tanya AI ─────────────────────────────────────────
-async function tanyaAI(prompt, systemPrompt = '', maxTokens = 1000) {
-    const response = await client.chat.completions.create({
-        model: 'google/gemini-2.5-flash',
-        messages: [
-            ...(systemPrompt ? [{ role: 'system', content: systemPrompt }] : []),
-            { role: 'user', content: prompt }
-        ],
-        max_tokens: maxTokens
-    });
-    return response.choices[0]?.message?.content || '';
-}
 
 // ──────────────────────────────────────────────────────────────
 module.exports = async (command, args, msg, user, db, sock, m) => {
