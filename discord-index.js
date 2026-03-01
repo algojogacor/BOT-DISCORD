@@ -1,12 +1,17 @@
 // ╔══════════════════════════════════════════════════════════════╗
-// ║           ALGOJO BOT DISCORD v1.0 — discord-index.js        ║
+// ║           ALGOJO BOT DISCORD v2.0 — discord-index.js        ║
 // ║           Shared DB dengan Bot WA (MongoDB Atlas)            ║
 // ╚══════════════════════════════════════════════════════════════╝
 
 const { Client, GatewayIntentBits, Partials, EmbedBuilder, ActivityType } = require('discord.js');
 const { connectToCloud, loadDB, saveDB, addQuestProgress } = require('./helpers/database');
 const { createDiscordMsg } = require('./helpers/discordAdapter');
-const setupCmd = require('./commands/discord/setup');
+
+// ─── DISCORD SPECIFIC COMMANDS ────────────────────────────────────────────
+const setupCmd    = require('./commands/discord/setup');
+const linkCmd     = require('./commands/discord/link');
+const dcMenuCmd   = require('./commands/discord/dcmenu');
+const dcMenuFullCmd = require('./commands/discord/dcmenufull');
 
 // ─── IMPORT COMMANDS (sama persis dengan WA) ──────────────────────────────
 const bankCmd        = require('./commands/bank');
@@ -32,10 +37,21 @@ const zodiakCmd      = require('./commands/zodiak');
 const gameTebakCmd   = require('./commands/gameTebak');
 const menuCmd        = require('./commands/menu');
 
-// ─── DISCORD SPECIFIC COMMANDS ────────────────────────────────────────────
-const linkCmd        = require('./commands/discord/link');
-const dcMenuCmd      = require('./commands/discord/dcmenu');
-const dcMenuFullCmd  = require('./commands/discord/dcmenufull');
+// ─── FITUR DISCORD BARU (v2.0) ────────────────────────────────────────────
+const registerWelcome        = require('./commands/discord/welcome');
+const registerReactionRoles  = require('./commands/discord/reactionroles');
+const registerStatsChannel   = require('./commands/discord/statschannel');
+const registerAutoPost       = require('./commands/discord/autopost');
+const registerAutoMod        = require('./commands/discord/automod');
+const registerModeration     = require('./commands/discord/moderation');
+const registerTicket         = require('./commands/discord/ticket');
+const registerLevelXP        = require('./commands/discord/levelxp');
+const registerGiveaway       = require('./commands/discord/giveaway');
+const registerEventScheduler = require('./commands/discord/eventscheduler');
+const registerShop           = require('./commands/discord/shop');
+const registerTipNetworth    = require('./commands/discord/tipnetworth');
+const registerPersistence    = require('./commands/discord/persistence');
+const registerPoll           = require('./commands/discord/poll');
 
 // ══════════════════════════════════════════════════════════════════════
 // DISCORD CLIENT SETUP
@@ -46,18 +62,52 @@ const client = new Client({
         GatewayIntentBits.GuildMessages,
         GatewayIntentBits.MessageContent,
         GatewayIntentBits.GuildMembers,
+        GatewayIntentBits.GuildPresences,
+        GatewayIntentBits.GuildMessageReactions,
         GatewayIntentBits.DirectMessages,
     ],
-    partials: [Partials.Channel, Partials.Message],
+    partials: [Partials.Channel, Partials.Message, Partials.GuildMember],
 });
+
+// ── Daftarkan semua fitur (HARUS setelah client dibuat, SEBELUM login) ────
+registerPersistence(client);  // ← HARUS PERTAMA agar db siap
+registerPoll(client);
+registerWelcome(client);
+registerReactionRoles(client);
+registerStatsChannel(client);
+registerAutoPost(client);
+registerAutoMod(client);
+registerModeration(client);
+registerTicket(client);
+registerLevelXP(client);
+registerGiveaway(client);
+registerEventScheduler(client);
+registerShop(client);
+registerTipNetworth(client);
 
 // ══════════════════════════════════════════════════════════════════════
 // BOT READY
 // ══════════════════════════════════════════════════════════════════════
-client.once('ready', async () => {
+client.once('clientReady', async () => {
     console.log('\n' + '═'.repeat(50));
-    console.log(`✅ ALGOJO DISCORD BOT SIAP! Login sebagai: ${client.user.tag}`);
+    console.log(`✅ ALGOJO DISCORD BOT v2.0 SIAP! Login sebagai: ${client.user.tag}`);
     console.log('═'.repeat(50) + '\n');
+    console.log('📦 Fitur aktif:');
+    console.log('   ✅ Welcome & Leave');
+    console.log('   ✅ Reaction Roles');
+    console.log('   ✅ Stats Channel');
+    console.log('   ✅ Auto Post Harian');
+    console.log('   ✅ Auto Mod');
+    console.log('   ✅ Moderation (warn/mute/kick/ban)');
+    console.log('   ✅ Ticket System');
+    console.log('   ✅ Level & XP Discord');
+    console.log('   ✅ Giveaway System');
+    console.log('   ✅ Event Scheduler');
+    console.log('   ✅ Discord Shop');
+    console.log('   ✅ Tip & Net Worth Board');
+    console.log('   ✅ Poll System (MongoDB)');
+    console.log('   ✅ Persistence (semua data tersimpan MongoDB)');
+    console.log('');
 
     client.user.setActivity('!menu | Algojo v2.0', { type: ActivityType.Playing });
 });
@@ -76,12 +126,11 @@ client.on('messageCreate', async (message) => {
     const guildId   = message.guild?.id || 'dm';
     const pushName  = message.author.username;
 
-    // ── Resolve sender: cek apakah user sudah link WA ─────────────────
-    // Kalau belum link, pakai discordId sebagai key dengan prefix "dc_"
+    // ── Resolve sender ─────────────────────────────────────────────
     const linkedWA = db.discordLinks?.[discordId];
     const sender   = linkedWA || `dc_${discordId}`;
 
-    // ── Register user baru jika belum ada ─────────────────────────────
+    // ── Register user baru ─────────────────────────────────────────
     const today = new Date().toISOString().split('T')[0];
     const defaultQuest = {
         daily: [
@@ -112,7 +161,8 @@ client.on('messageCreate', async (message) => {
             dailyIncome: 0, dailyUsage: 0,
             aiMemory: [], aiFullHistory: [], aiPersona: 'default',
             aiStats: { totalMessages: 0, totalChars: 0, firstChatDate: null },
-            platform: 'discord', // penanda platform
+            badges: [], discordBoosts: {},
+            platform: 'discord',
         };
         console.log(`[NEW DISCORD USER] ${pushName} (${discordId}) registered`);
     }
@@ -121,15 +171,17 @@ client.on('messageCreate', async (message) => {
     user.lastSeen = Date.now();
     user.name     = pushName || user.name;
 
-    // ── Auto-fix field (sama dengan WA) ───────────────────────────────
-    if (!user.crypto)     user.crypto     = {};
-    if (!user.quest)      user.quest      = JSON.parse(JSON.stringify(defaultQuest));
-    if (!user.forex)      user.forex      = { usd: 0, eur: 0, jpy: 0, emas: 0 };
-    if (!user.farm)       user.farm       = { plants: [], inventory: {}, machines: [], processing: [] };
-    if (!user.mining)     user.mining     = { racks: [], lastClaim: 0, totalHash: 0 };
-    if (!user.aiMemory)   user.aiMemory   = [];
-    if (!user.aiPersona)  user.aiPersona  = 'default';
-    if (!user.aiStats)    user.aiStats    = { totalMessages: 0, totalChars: 0, firstChatDate: null };
+    // ── Auto-fix field ─────────────────────────────────────────────
+    if (!user.crypto)        user.crypto        = {};
+    if (!user.quest)         user.quest         = JSON.parse(JSON.stringify(defaultQuest));
+    if (!user.forex)         user.forex         = { usd: 0, eur: 0, jpy: 0, emas: 0 };
+    if (!user.farm)          user.farm          = { plants: [], inventory: {}, machines: [], processing: [] };
+    if (!user.mining)        user.mining        = { racks: [], lastClaim: 0, totalHash: 0 };
+    if (!user.aiMemory)      user.aiMemory      = [];
+    if (!user.aiPersona)     user.aiPersona     = 'default';
+    if (!user.aiStats)       user.aiStats       = { totalMessages: 0, totalChars: 0, firstChatDate: null };
+    if (!user.badges)        user.badges        = [];
+    if (!user.discordBoosts) user.discordBoosts = {};
 
     // Daily reset
     if (user.quest?.lastReset !== today) {
@@ -139,7 +191,7 @@ client.on('messageCreate', async (message) => {
         user.dailyUsage  = 0;
     }
 
-    // XP & Leveling
+    // XP & Leveling (dari WA/game system, bukan Discord XP)
     user.xp += user.buffs?.xp?.active ? 5 : 2;
     if (user.quest?.weekly && !user.quest.weekly.claimed) user.quest.weekly.progress++;
     const nextLvl = Math.floor(user.xp / 100) + 1;
@@ -154,33 +206,33 @@ client.on('messageCreate', async (message) => {
         db.analytics.totalMessages = (db.analytics.totalMessages || 0) + 1;
     }
 
-    // ── Parse command ─────────────────────────────────────────────────
+    // ── Parse command ──────────────────────────────────────────────
     const args    = message.content.slice(1).trim().split(/ +/);
     const command = args.shift().toLowerCase();
     const body    = message.content;
 
     console.log(`📨 [Discord] ${pushName}: ${body.slice(0, 50)}`);
 
-    // ── Buat msg adapter (format sama dengan WA) ──────────────────────
     const msg = createDiscordMsg(message, body, sender, pushName, guildId);
 
-    // ── Analytics per command ─────────────────────────────────────────
     if (db.analytics) {
         if (!db.analytics.commands) db.analytics.commands = {};
         db.analytics.commands[command] = (db.analytics.commands[command] || 0) + 1;
     }
 
-    // ══════════════════════════════════════════════════════════════════
+    // ══════════════════════════════════════════════════════════════
     // DISPATCH COMMANDS
-    // ══════════════════════════════════════════════════════════════════
+    // ══════════════════════════════════════════════════════════════
 
-    // Discord-specific commands
+    // Discord-specific
     await linkCmd(command, args, msg, user, db, discordId)
         .catch(e => console.error('[Link]', e.message));
     await dcMenuCmd(command, args, msg, user, db)
         .catch(e => console.error('[DCMenu]', e.message));
     await dcMenuFullCmd(command, args, msg, user, db)
         .catch(e => console.error('[DCMenuFull]', e.message));
+    await setupCmd(command, args, msg, user, db, client)
+        .catch(e => console.error('[Setup]', e.message));
 
     // Shared commands (sama dengan WA)
     await bankCmd(command, args, msg, user, db, null)
@@ -209,8 +261,6 @@ client.on('messageCreate', async (message) => {
         .catch(e => console.error('[Roulette]', e.message));
     await battleCmd(command, args, msg, user, db)
         .catch(e => console.error('[Battle]', e.message));
-        await setupCmd(command, args, msg, user, db, client)
-    .catch(e => console.error('[Setup]', e.message));
     await duelCmd(command, args, msg, user, db)
         .catch(e => console.error('[Duel]', e.message));
     await bolaCmd(command, args, msg, user, db, sender)
@@ -235,22 +285,24 @@ async function startDiscordBot() {
         console.log('🔄 Menghubungkan ke MongoDB Atlas...');
         await connectToCloud();
         global.db = await loadDB();
-        if (!global.db.users)         global.db.users         = {};
-        if (!global.db.groups)        global.db.groups        = {};
-        if (!global.db.market)        global.db.market        = { commodities: {} };
-        if (!global.db.settings)      global.db.settings      = {};
-        if (!global.db.reminders)     global.db.reminders     = {};
-        if (!global.db.analytics)     global.db.analytics     = { commands: {}, totalMessages: 0 };
-        if (!global.db.discordLinks)  global.db.discordLinks  = {}; // ← KEY BARU: mapping discordId → waJid
+        if (!global.db.users)        global.db.users        = {};
+        if (!global.db.groups)       global.db.groups       = {};
+        if (!global.db.market)       global.db.market       = { commodities: {} };
+        if (!global.db.settings)     global.db.settings     = {};
+        if (!global.db.reminders)    global.db.reminders    = {};
+        if (!global.db.analytics)    global.db.analytics    = { commands: {}, totalMessages: 0 };
+        if (!global.db.discordLinks) global.db.discordLinks = {};
         console.log('✅ Database Terhubung!');
     } catch(err) {
         console.error('⚠️ GAGAL KONEK DB:', err.message);
-        global.db = { users: {}, groups: {}, market: {}, settings: {}, reminders: {}, analytics: { commands: {}, totalMessages: 0 }, discordLinks: {} };
+        global.db = {
+            users: {}, groups: {}, market: {}, settings: {},
+            reminders: {}, analytics: { commands: {}, totalMessages: 0 },
+            discordLinks: {},
+        };
     }
 
-    // Auto save setiap 60 detik
     setInterval(() => { if (global.db) saveDB(global.db); }, 60000);
-
     await client.login(process.env.DISCORD_TOKEN);
 }
 
