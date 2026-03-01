@@ -10,16 +10,20 @@
 
 require('dotenv').config();
 const axios = require('axios');
-const OpenAI = require('openai');
 const fs = require('fs');
 const path = require('path');
 const { Readable } = require('stream');
+const RAILWAY_URL = process.env.RAILWAY_API_URL;
 
-const client = new OpenAI({
-    baseURL: 'https://openrouter.ai/api/v1',
-    apiKey: process.env.OPENROUTER_API_KEY,
-    defaultHeaders: { "HTTP-Referer": "https://wa-bot.com", "X-Title": "Arya Bot Kreatif" }
-});
+async function tanyaAI(prompt, systemPrompt = '') {
+    const res = await axios.post(`${RAILWAY_URL}/chat`, {
+        system: systemPrompt,
+        messages: [{ role: 'user', content: prompt }]
+    }, { timeout: 60000 });
+    if (res.data?.error) throw new Error(res.data.error);
+    return res.data?.reply || '';
+}
+
 
 const TEMP_DIR = path.join(__dirname, '../temp');
 if (!fs.existsSync(TEMP_DIR)) fs.mkdirSync(TEMP_DIR, { recursive: true });
@@ -53,105 +57,49 @@ module.exports = async (command, args, msg, user, db, sock, m) => {
 
     const userId = msg.author || msg.from;
 
-    // ══════════════════════════════════════════════════════════
-    // FITUR 31: LIRIK LAGU — !lirik <judul> <artis>
-    // ══════════════════════════════════════════════════════════
-    if (['lirik', 'lyrics'].includes(command)) {
-        const query = args.join(' ').trim();
+   // ══════════════════════════════════════════════════════════
+// FITUR 31: LIRIK LAGU — !lirik <judul> <artis>
+// ══════════════════════════════════════════════════════════
+if (['lirik', 'lyrics'].includes(command)) {
+    const query = args.join(' ').trim();
 
-        if (!query) {
-            return msg.reply(
-                `🎵 *LIRIK LAGU*\n\n` +
-                `Cara pakai:\n` +
-                `• \`!lirik <judul lagu>\`\n` +
-                `• \`!lirik <judul> - <artis>\`\n\n` +
-                `Contoh:\n` +
-                `\`!lirik Riptide Vance Joy\`\n` +
-                `\`!lirik Berapa Selamanya - Raisa\``
-            );
-        }
-
-        await msg.reply(`🎵 _Mencari lirik "${query}"..._`);
-
-        try {
-            // Cari via Lyrics.ovh API (gratis)
-            let judul = query;
-            let artis = '';
-
-            // Parse "judul - artis" atau "judul artis" (tebak)
-            if (query.includes(' - ')) {
-                [judul, artis] = query.split(' - ').map(s => s.trim());
-            } else if (query.includes(' by ')) {
-                [judul, artis] = query.split(' by ').map(s => s.trim());
-            }
-
-            let lirik = null;
-
-            // Coba Lyrics.ovh jika ada artis
-            if (artis) {
-                try {
-                    const res = await axios.get(
-                        `https://api.lyrics.ovh/v1/${encodeURIComponent(artis)}/${encodeURIComponent(judul)}`,
-                        { timeout: 8000 }
-                    );
-                    if (res.data.lyrics) {
-                        lirik = { artis, judul, teks: res.data.lyrics };
-                    }
-                } catch (e) { /* coba cara lain */ }
-            }
-
-            // Fallback: Pakai AI untuk informasi lirik
-            if (!lirik) {
-                const systemPrompt = `Kamu adalah asisten musik yang berpengetahuan luas.
-Berikan informasi tentang lagu yang diminta.
-PENTING: Jangan reproduksi lirik lengkap karena hak cipta. 
-Berikan:
-1. Informasi lagu (artis, tahun, album, genre)
-2. Tema dan makna lagu secara ringkas
-3. Bait atau bagian terkenal MAKSIMAL 2 baris saja sebagai referensi
-4. Terjemahan tema umum ke Bahasa Indonesia jika lagu berbahasa asing
-5. Rekomendasi lagu serupa
-
-Format yang menarik dan informatif.`;
-
-                const hasil = await tanyaAI(`Informasi tentang lagu: "${query}"`, systemPrompt, 800);
-
-                return msg.reply(
-                    `🎵 *INFORMASI LAGU*\n` +
-                    `${'─'.repeat(30)}\n\n` +
-                    `🔍 Pencarian: "${query}"\n\n` +
-                    `${hasil}\n\n` +
-                    `${'─'.repeat(20)}\n` +
-                    `💡 Untuk lirik lengkap, kunjungi:\n` +
-                    `• genius.com\n` +
-                    `• azlyrics.com\n` +
-                    `• lirik.net (Indonesia)`
-                );
-            }
-
-            // Batasi lirik yang ditampilkan (max 50 baris)
-            const barisBaris = lirik.teks.split('\n');
-            const tampil = barisBaris.slice(0, 40).join('\n');
-            const adaTerpotong = barisBaris.length > 40;
-
-            // Terjemahan tema (jika terdeteksi bukan Indonesia)
-            let terjemahan = '';
-            const isMungkinAsingLog = /[a-zA-Z]{4,}/.test(tampil) && !/[a-z]{2,}/.test(tampil.substring(0, 50).toLowerCase().replace(/[^a-z]/g, ''));
-
-            return msg.reply(
-                `🎵 *${lirik.judul.toUpperCase()}*\n` +
-                `🎤 ${lirik.artis}\n` +
-                `${'─'.repeat(30)}\n\n` +
-                `${tampil}\n` +
-                (adaTerpotong ? `\n_... (${barisBaris.length - 40} baris lagi)_\n` : '') +
-                `\n${'─'.repeat(20)}\n` +
-                `_Terjemahan makna: \`!translate indonesia <teks>\`_`
-            );
-        } catch (e) {
-            console.error('Lirik Error:', e.message);
-            return msg.reply(`❌ Tidak bisa menemukan lirik untuk "${query}".\n\nCoba format: \`!lirik Judul - Artis\``);
-        }
+    if (!query) {
+        return msg.reply(
+            `🎵 *LIRIK LAGU*\n\n` +
+            `Cara pakai:\n` +
+            `• \`!lirik <judul lagu>\`\n` +
+            `• \`!lirik <judul> - <artis>\`\n\n` +
+            `Contoh:\n` +
+            `\`!lirik Riptide Vance Joy\`\n` +
+            `\`!lirik Berapa Selamanya - Raisa\``
+        );
     }
+
+    await msg.reply(`🎵 _Mencari info lagu "${query}"..._`);
+
+    try {
+        const systemPrompt = `Kamu adalah asisten musik.
+Berikan informasi tentang lagu yang diminta dalam Bahasa Indonesia.
+Sertakan: artis, tahun, album, genre, tema/makna lagu, dan berikan lirik penuhnya.
+Format menarik dengan emoji.`;
+
+        const hasil = await tanyaAI(
+            `Informasi lagu: "${query}"`, 
+            systemPrompt
+        );
+
+        return msg.reply(
+            `🎵 *INFO LAGU*\n` +
+            `${'─'.repeat(30)}\n\n` +
+            `${hasil}\n\n` +
+            `${'─'.repeat(20)}\n` +
+            `💡 Lirik lengkap: genius.com | azlyrics.com`
+        );
+    } catch (e) {
+        console.error('Lirik Error:', e.message);
+        return msg.reply(`❌ Gagal mencari info lagu "${query}". Coba lagi.`);
+    }
+}
 
     // ══════════════════════════════════════════════════════════
     // FITUR 33: MEME GENERATOR — !meme <template>|<atas>|<bawah>
