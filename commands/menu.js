@@ -1510,6 +1510,11 @@ ${'─'.repeat(30)}
   → Ringkas artikel/teks panjang otomatis
   → Contoh: !summarize https://...
 
+!ringkasdoc / !summarizedoc + kirim/reply file
+  → Ringkas otomatis file PDF atau Word (.docx)
+  → Upload file lalu ketik !ringkasdoc
+  → Mode analisis mendalam: !analisisdok
+
 !translate / !terjemah <lang> <teks>
   → Terjemah teks ke bahasa target
   → Contoh: !translate en Halo semuanya

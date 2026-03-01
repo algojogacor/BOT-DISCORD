@@ -70,6 +70,7 @@ const menuCmd        = require('./commands/menu');
 const aiToolsCmd   = require('./commands/aitools');
 const moodCmd      = require('./commands/mood');
 const triviaCmd    = require('./commands/trivia');
+const summarizeDocCmd = require('./commands/summarize_doc');
 const wordleCmd    = require('./commands/wordle');
 const akinatorCmd  = require('./commands/akinator');
 const portoCmd     = require('./commands/portofolio');
@@ -560,6 +561,8 @@ async function startBot() {
                 .catch(e => console.error('[LinkDC]', e.message));
             await miningCmd(command, args, msg, user, db, sock)
                 .catch(e => console.error('[Mining]', e.message));
+                await summarizeDocCmd(command, args, msg, user, db, sock, m)
+    .catch(e => console.error('[SummarizeDoc]', e.message));
             await duelCmd(command, args, msg, user, db)
                 .catch(e => console.error('[Duel]', e.message));
             await bolaCmd(command, args, msg, user, db, sender)

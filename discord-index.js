@@ -53,6 +53,9 @@ const registerTipNetworth    = require('./commands/discord/tipnetworth');
 const registerPersistence    = require('./commands/discord/persistence');
 const registerPoll           = require('./commands/discord/poll');
 
+// ─── AI TOOLS ─────────────────────────────────────────────────────────────
+const summarizeDocCmd = require('./commands/summarize_doc');
+
 // ══════════════════════════════════════════════════════════════════════
 // DISCORD CLIENT SETUP
 // ══════════════════════════════════════════════════════════════════════
@@ -107,6 +110,7 @@ client.once('clientReady', async () => {
     console.log('   ✅ Tip & Net Worth Board');
     console.log('   ✅ Poll System (MongoDB)');
     console.log('   ✅ Persistence (semua data tersimpan MongoDB)');
+    console.log('   ✅ Summarize Dokumen PDF & DOCX');
     console.log('');
 
     client.user.setActivity('!menu | Algojo v2.0', { type: ActivityType.Playing });
@@ -275,6 +279,10 @@ client.on('messageCreate', async (message) => {
         .catch(e => console.error('[Zodiak]', e.message));
     await gameTebakCmd(command, args, msg, user, db, body)
         .catch(e => console.error('[GameTebak]', e.message));
+
+    // AI Tools
+    await summarizeDocCmd(command, args, msg, user, db, null, null)
+        .catch(e => console.error('[SummarizeDoc]', e.message));
 });
 
 // ══════════════════════════════════════════════════════════════════════
