@@ -43,6 +43,7 @@ const valasCmd       = require('./commands/valas');
 const stocksCmd      = require('./commands/stocks');
 const farmingCmd     = require('./commands/farming');
 const ternakCmd      = require('./commands/ternak');
+const neonSkyCmd = require('./commands/claimneonsky');
 const miningCmd      = require('./commands/mining');
 const devCmd         = require('./commands/developer');
 const cryptoCmd      = require('./commands/crypto');
@@ -579,6 +580,8 @@ async function startBot() {
                 .catch(e => console.error('[Roulette]', e.message));
             await battleCmd(command, args, msg, user, db)
                 .catch(e => console.error('[Battle]', e.message));
+                await neonSkyCmd(command, args, msg, user, db)
+                .catch(e => console.error('[NeonSky]', e.message));
             await ttsCmd(command, args, msg)
                 .catch(e => console.error('[TTS]', e.message));
             await wikiKnowCmd(command, args, msg)
