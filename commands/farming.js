@@ -1,4 +1,5 @@
 const { saveDB } = require('../helpers/database');
+const { tambahIncome } = require('./pajak');
 
 // HELPER FORMAT ANGKA
 const fmt = (num) => Math.floor(Number(num)).toLocaleString('id-ID');
@@ -382,6 +383,7 @@ module.exports = async (command, args, msg, user, db) => {
         const total = hargaJual * qty * panenMult;
         user.balance += total;
         user.dailyIncome = (user.dailyIncome || 0) + total;
+        tambahIncome(user, total); 
         user.farm.inventory[item] -= qty;
         if (user.farm.inventory[item] === 0) delete user.farm.inventory[item];
         

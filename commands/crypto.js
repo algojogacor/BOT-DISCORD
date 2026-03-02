@@ -1,5 +1,6 @@
 const axios = require('axios'); 
 const { saveDB } = require('../helpers/database');
+const { tambahCapitalGains } = require('./pajak'); 
 
 // HELPER FORMAT ANGKA
 const fmt = (num) => {
@@ -130,26 +131,40 @@ module.exports = async (command, args, msg, user, db) => {
     }
 
     // 2. BELI (REAL PRICE)
-    if (command === 'buycrypto') {
-        const koin = args[0]?.toLowerCase();
-        const nominal = parseInt(args[1]);
+if (command === 'buycrypto') {
+    const koin = args[0]?.toLowerCase();
+    const nominal = parseInt(args[1]);
 
-        if (!COIN_IDS[koin]) return msg.reply(`❌ Koin tidak ada. List: ${Object.keys(COIN_IDS).join(', ')}`);
-        if (!market.prices[koin]) return msg.reply("❌ Data harga sedang loading... coba lagi.");
-        if (isNaN(nominal) || nominal < 10000) return msg.reply("❌ Min beli Rp 10.000");
-        if (user.balance < nominal) return msg.reply(`❌ Uang kurang. Saldo: Rp ${fmt(user.balance)}`);
+    if (!COIN_IDS[koin]) return msg.reply(`❌ Koin tidak ada. List: ${Object.keys(COIN_IDS).join(', ')}`);
+    if (!market.prices[koin]) return msg.reply("❌ Data harga sedang loading... coba lagi.");
+    if (isNaN(nominal) || nominal < 10000) return msg.reply("❌ Min beli Rp 10.000");
+    if (user.balance < nominal) return msg.reply(`❌ Uang kurang. Saldo: Rp ${fmt(user.balance)}`);
 
-        const currentPrice = market.prices[koin].price;
-        const fee = nominal * 0.001; // Fee 0.1%
-        const bersih = nominal - fee;
-        const amount = bersih / currentPrice;
+    const currentPrice = market.prices[koin].price;
+    const fee = nominal * 0.001;
+    const bersih = nominal - fee;
+    const amount = bersih / currentPrice;
 
-        user.balance -= nominal;
-        user.crypto[koin] = (user.crypto[koin] || 0) + amount;
-        saveDB(db);
+    // Simpan rata-rata harga beli SEBELUM update qty
+    if (!user.cryptoAvg) user.cryptoAvg = {};
+    const oldQty = user.crypto[koin] || 0;
+    const oldAvg = user.cryptoAvg[koin] || currentPrice;
+    user.cryptoAvg[koin] = Math.floor(
+        (oldQty * oldAvg + bersih) / (oldQty + amount)
+    );
 
-        return msg.reply(`✅ *BELI SUKSES*\nKoin: ${koin.toUpperCase()}\nHarga Real: Rp ${fmt(currentPrice)}\nBayar: Rp ${fmt(nominal)}\n📦 *Dapat: ${amount.toFixed(8)} ${koin.toUpperCase()}*`);
-    }
+    user.balance -= nominal;
+    user.crypto[koin] = oldQty + amount;
+    saveDB(db);
+
+    return msg.reply(
+        `✅ *BELI SUKSES*\n` +
+        `Koin: ${koin.toUpperCase()}\n` +
+        `Harga Real: Rp ${fmt(currentPrice)}\n` +
+        `Bayar: Rp ${fmt(nominal)}\n` +
+        `📦 *Dapat: ${amount.toFixed(8)} ${koin.toUpperCase()}*`
+    );
+}
 
     // 3. JUAL (REAL PRICE + PAJAK SULTAN)
     if (command === 'sellcrypto') {
@@ -177,12 +192,30 @@ module.exports = async (command, args, msg, user, db) => {
         user.crypto[koin] -= amount;
         if (user.crypto[koin] <= 0) delete user.crypto[koin];
         
-        user.balance += net;
-        user.dailyIncome = (user.dailyIncome || 0) + net;
-        tambahCapitalGains(user, net);
-        saveDB(db);
+        // Hitung modal beli (estimasi dari harga rata-rata)
+const modalBeli = Math.floor(amount * (user.cryptoAvg?.[koin] || currentPrice));
+const profit = net - modalBeli;
 
-        return msg.reply(`✅ *JUAL SUKSES*\nKoin: ${koin.toUpperCase()}\nHarga Real: Rp ${fmt(currentPrice)}\nJual: ${amount.toFixed(8)}\n\n💰 Gross: Rp ${fmt(gross)}\n💸 Tax (${taxRate*100}%): Rp ${fmt(tax)}\n💵 *Terima: Rp ${fmt(net)}*`);
+user.balance += net;
+user.dailyIncome = (user.dailyIncome || 0) + net;
+
+let pajakCG = 0;
+if (profit > 0) {
+    pajakCG = tambahCapitalGains(user, profit); // ← Hanya dari profit
+}
+
+saveDB(db);
+
+return msg.reply(
+    `✅ *JUAL SUKSES*\n` +
+    `Koin: ${koin.toUpperCase()}\n` +
+    `Harga Real: Rp ${fmt(currentPrice)}\n` +
+    `Jual: ${amount.toFixed(8)}\n\n` +
+    `💰 Gross: Rp ${fmt(gross)}\n` +
+    `💸 Tax (${taxRate*100}%): Rp ${fmt(tax)}\n` +
+    `💵 *Terima: Rp ${fmt(net)}*\n` +
+    (pajakCG > 0 ? `🧾 Capital Gains Tax: Rp ${fmt(pajakCG)} (10%)\n_Bayar via !bayarpajak_` : '')
+);
     }
 
     // 4. MARGIN (LEVERAGE DI DATA REAL)

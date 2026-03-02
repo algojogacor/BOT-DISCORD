@@ -1,4 +1,5 @@
 const { saveDB } = require('../helpers/database');
+const { tambahIncome } = require('./pajak'); 
 
 // HELPER FORMAT ANGKA
 const fmt = (num) => Math.floor(Number(num)).toLocaleString('id-ID');
@@ -249,55 +250,92 @@ module.exports = async (command, args, msg, user, db) => {
     }
 
     // ============================================================
-    // 6. BERI MAKAN (!pakan <nomor> <jenis>)
+    // 6. BERI MAKAN (!pakan <nomor/nomor,nomor> <jenis>)
     // ============================================================
     if (command === 'pakan' || command === 'feed') {
-        const index = parseInt(args[0]) - 1;
         const feedType = args[1]?.toLowerCase();
 
-        if (isNaN(index) || !user.ternak[index]) return msg.reply("❌ Salah nomor hewan. Cek `!kandang`");
         if (!feedType || !ITEMS[feedType] || ITEMS[feedType].type === 'med') {
-            return msg.reply("❌ Jenis pakan salah. Pilih: `dedak`, `pelet`, atau `premium`.");
+            return msg.reply("❌ Jenis pakan salah. Pilih: `dedak`, `pelet`, atau `premium`.\nContoh: `!pakan 1,2,3 dedak`");
         }
 
-        const animal = user.ternak[index];
-        const conf = ANIMALS[animal.type];
+        // Parse nomor hewan — support "1,2,3" atau single "1"
+        const rawNomor = args[0] || '';
+        const nomorList = [...new Set(
+            rawNomor.split(',').map(n => parseInt(n.trim()) - 1)
+        )].filter(i => !isNaN(i) && i >= 0 && i < user.ternak.length);
+
+        if (nomorList.length === 0) return msg.reply("❌ Salah nomor hewan. Cek `!kandang`");
+
+        // Cek stok cukup untuk semua hewan yang valid
+        const stokAda = user.ternak_inv[feedType] || 0;
+        if (stokAda < nomorList.length) {
+            return msg.reply(
+                `❌ Stok ${ITEMS[feedType].name} kurang!\n` +
+                `Butuh: ${nomorList.length} | Stok: ${stokAda}\n` +
+                `Beli di \`!tokopakan\``
+            );
+        }
+
         const item = ITEMS[feedType];
+        let hasil = [];
+        let gagal = [];
 
-        // VALIDASI MATI & SAKIT
-        const diff = (now - animal.lastFeed) / 60000;
-        if (diff > DEATH_LIMIT) return msg.reply("❌ Hewan sudah mati. Tidak bisa makan.");
-        if (animal.isSick) return msg.reply("❌ Hewan sedang SAKIT! Sembuhkan dulu pakai `!obati <nomor>`.");
-        if (diff < 10) return msg.reply("❌ Masih terlalu kenyang.");
+        for (const index of nomorList) {
+            const animal = user.ternak[index];
+            const conf = ANIMALS[animal.type];
+            const diff = (now - animal.lastFeed) / 60000;
 
-        // VALIDASI STOK
-        if (!user.ternak_inv[feedType] || user.ternak_inv[feedType] < 1) {
-            return msg.reply(`❌ Stok ${item.name} habis! Beli di \`!tokopakan\`.`);
-        }
+            if (diff > DEATH_LIMIT) {
+                gagal.push(`${index+1}. ${conf.name} — ☠️ Sudah mati`);
+                continue;
+            }
+            if (animal.isSick) {
+                gagal.push(`${index+1}. ${conf.name} — 🤢 Sakit, obati dulu`);
+                continue;
+            }
+            if (diff < 10) {
+                gagal.push(`${index+1}. ${conf.name} — 😋 Masih kenyang`);
+                continue;
+            }
 
-        // PROSES MAKAN
-        user.ternak_inv[feedType] -= 1;
-        animal.lastFeed = now;
+            // Proses makan
+            user.ternak_inv[feedType] -= 1;
+            animal.lastFeed = now;
 
-        // Random SAKIT (Chance 5% tiap makan)
-        if (Math.random() < 0.05) {
-            animal.isSick = true;
-            saveDB(db);
-            return msg.reply(`🤢 Waduh! Setelah makan, ${conf.name} malah jatuh SAKIT.\nSegera beli obat dan gunakan \`!obati ${index+1}\`!`);
-        }
+            // Random sakit (5%)
+            if (Math.random() < 0.05) {
+                animal.isSick = true;
+                gagal.push(`${index+1}. ${conf.name} — 🤢 Jatuh sakit setelah makan!`);
+                continue;
+            }
 
-        // Pertumbuhan berdasarkan kualitas pakan
-        if (animal.weight < conf.maxWeight) {
-            const growth = conf.growthRate * item.effect; // Base Growth x Effect Pakan
-            animal.weight += growth;
-            if (animal.weight > conf.maxWeight) animal.weight = conf.maxWeight;
-            
-            saveDB(db);
-            return msg.reply(`🍔 Nyam! Makan ${item.name}.\n⚖️ Berat naik +${growth.toFixed(2)}kg menjadi ${animal.weight.toFixed(2)}kg.`);
+            // Pertumbuhan
+            if (animal.weight < conf.maxWeight) {
+                const growth = conf.growthRate * item.effect;
+                animal.weight += growth;
+                if (animal.weight > conf.maxWeight) animal.weight = conf.maxWeight;
+                hasil.push(`${index+1}. ${conf.name} +${growth.toFixed(2)}kg → ${animal.weight.toFixed(2)}kg`);
+            } else {
+                hasil.push(`${index+1}. ${conf.name} — Berat sudah maksimal`);
+            }
         }
 
         saveDB(db);
-        return msg.reply(`🍔 Makan ${item.name}, tapi berat sudah maksimal.`);
+
+        let res = `🍽️ *HASIL PEMBERIAN PAKAN*\n`;
+        res += `Pakan: ${item.name}\n`;
+        res += `─────────────────────\n`;
+        if (hasil.length > 0) {
+            res += `✅ *Berhasil (${hasil.length}):*\n`;
+            res += hasil.map(h => `  ${h}`).join('\n') + '\n';
+        }
+        if (gagal.length > 0) {
+            res += `\n❌ *Gagal (${gagal.length}):*\n`;
+            res += gagal.map(g => `  ${g}`).join('\n') + '\n';
+        }
+        res += `\n🎒 Sisa stok ${feedType}: ${user.ternak_inv[feedType]}`;
+        return msg.reply(res);
     }
 
     // ============================================================
@@ -359,6 +397,7 @@ module.exports = async (command, args, msg, user, db) => {
         const finalPrice = total + bonus;
         user.balance += finalPrice;
         user.dailyIncome = (user.dailyIncome || 0) + finalPrice;
+        tambahIncome(user, finalPrice); // ← TAMBAH INI
         user.ternak.splice(index, 1);
         saveDB(db);
 
