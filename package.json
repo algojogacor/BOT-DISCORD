@@ -4,7 +4,7 @@
   "description": "Algojo Bot WA v2.0 — Tercanggih",
   "main": "index.js",
   "scripts": {
-    "start": "node index.js",
+    "start": "node start-all.js",
     "start:wa": "node index.js",
     "start:discord": "node discord-index.js",
     "start:all": "concurrently \"node index.js\" \"node discord-index.js\"",

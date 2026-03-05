@@ -1,0 +1,33 @@
+=== ACCENTED NAMES ===
+Rodrigo HernÃ¡ndez Cascante
+Enzo JeremÃ­as FernÃ¡ndez
+Robert Lynch SÃ¡nchez
+JosÃ© Ignacio FernÃ¡ndez Iglesias
+Daniel Ceballos FernÃ¡ndez
+Denis SuÃ¡rez FernÃ¡ndez
+JesÃºs JoaquÃ­n FernÃ¡ndez SÃ¡ez de la Torre
+Rodrigo SÃ¡nchez RodrÃ­guez
+JosÃ© AndrÃ©s Guardado HernÃ¡ndez
+Antonio SÃ¡nchez Navarro
+
+=== LA LIGA CLUBS ===
+Real Madrid
+Villarreal
+AtlÃ©tico Madrid
+FC Barcelona
+Athletic Club
+Sevilla
+Real Betis
+Mallorca
+Rayo Vallecano
+Real Sociedad
+Getafe
+CÃ¡diz
+Las Palmas
+Osasuna
+Girona
+AlmerÃ­a
+Granada
+Valencia
+Celta de Vigo
+Deportivo AlavÃ©s

@@ -1,0 +1,56 @@
+=== MOJIBAKE CHECK ===
+Found 15 rows with potential mojibake:
+Rodrigo HernÃÂ¡ndez Cascante
+RÃÂºben dos Santos Gato Alves Dias
+JoÃÂ¡ko Gvardiol
+Mateo KovaÃÂiÃâ¡
+Nathan AkÃÂ©
+JuliÃÂ¡n ÃÂlvarez
+JÃÂ©rÃÂ©my Doku
+Sergio GÃÂ³mez MartÃÂ­n
+DarÃÂ­o Ariel Sarmiento
+AndrÃÂ© Onana
+RaphaÃÂ«l Varane
+Lisandro MartÃÂ­nez
+JosÃÂ© Diogo Dalot Teixeira
+Victor JÃÂ¶rgen Nilsson LindelÃÂ¶f
+Sergio ReguilÃÂ³n RodrÃÂ­guez
+
+=== SAMPLE ACCENTED NAMES ===
+Rodrigo HernÃÂ¡ndez Cascante
+Christopher Nkunku
+Enzo JeremÃÂ­as FernÃÂ¡ndez
+Robert Lynch SÃÂ¡nchez
+JosÃÂ© Ignacio FernÃÂ¡ndez Iglesias
+Daniel Ceballos FernÃÂ¡ndez
+Denis SuÃÂ¡rez FernÃÂ¡ndez
+JesÃÂºs JoaquÃÂ­n FernÃÂ¡ndez SÃÂ¡ez de la Torre
+Rodrigo SÃÂ¡nchez RodrÃÂ­guez
+JosÃÂ© AndrÃÂ©s Guardado HernÃÂ¡ndez
+Antonio SÃÂ¡nchez Navarro
+Aridane HernÃÂ¡ndez UmpiÃÂ©rrez
+Daniel CÃÂ¡rdenas LÃÂ­ndez
+Diego MÃÂ©ndez Molero
+Brais MÃÂ©ndez Portela
+
+=== LA LIGA CLUBS ===
+Real Madrid
+Villarreal
+AtlÃÂ©tico Madrid
+FC Barcelona
+Athletic Club
+Sevilla
+Real Betis
+Mallorca
+Rayo Vallecano
+Real Sociedad
+Getafe
+CÃÂ¡diz
+Las Palmas
+Osasuna
+Girona
+AlmerÃÂ­a
+Granada
+Valencia
+Celta de Vigo
+Deportivo AlavÃÂ©s
