@@ -18,11 +18,11 @@ const COOLDOWN_MS = 5 * 60 * 1000;
 // ── HTTP helper ──────────────────────────────────────────────
 function apiRequest(endpoint, method, body) {
     return new Promise((resolve, reject) => {
-        const bodyStr = JSON.stringify(body);
+        const bodyStr = JSON.stringify(body || {});
         const url = new URL(`${OPENCODE_SERVER}${endpoint}`);
         const options = {
             hostname: url.hostname,
-            path: url.pathname,
+            path: url.pathname + (url.search || ''),
             method,
             headers: {
                 'Content-Type': 'application/json',
@@ -62,24 +62,21 @@ async function broadcastAll(sock, db, text) {
 
 // ══════════════════════════════════════════════════════════════
 // WEBHOOK HANDLER — dipanggil dari index.js
-// Menerima notif dari Railway: build_start, build_log, fix_log
 // ══════════════════════════════════════════════════════════════
 async function handleWebhook(payload, sock, db) {
     const { type, groupId } = payload;
     if (!groupId || !sock) return;
 
     if (type === 'build_start') {
-        // Notif mulai ke grup yang request
         await sock.sendMessage(groupId, {
             text:
                 `⚙️ *Algojo mulai membangun fitur...*\n\n` +
                 `📝 Request: _${payload.prompt}_\n` +
                 `👤 Oleh: ${payload.requester || 'Member'}\n\n` +
-                `_Akan ada update progress disini_ 🔄`
+                `_Update progress akan dikirim di sini_ 🔄`
         });
 
     } else if (type === 'build_progress') {
-        // Update progress per iterasi
         await sock.sendMessage(groupId, {
             text:
                 `🔄 *Iterasi ${payload.iteration}...*\n\n` +
@@ -88,33 +85,27 @@ async function handleWebhook(payload, sock, db) {
 
     } else if (type === 'build_log') {
         if (payload.success) {
-            // Kirim log thinking ke grup yang request
             const features = payload.features || [];
-            const logMsg =
-                `✅ *Algojo selesai! (${payload.iterations} iterasi)*\n\n` +
-                `🆕 *Fitur dibuat:*\n${features.map(f => `• !${f}`).join('\n')}\n\n` +
-                `${'─'.repeat(28)}\n` +
-                `💭 *Log pembuatan:*\n\n${payload.thinking}\n\n` +
-                `${'─'.repeat(28)}\n` +
-                `📖 *Cara penggunaan:*\n${payload.usage}\n\n` +
-                `⏳ _Broadcast ke semua grup setelah deploy selesai..._`;
+            await sock.sendMessage(groupId, {
+                text:
+                    `✅ *Algojo selesai! (${payload.iterations} iterasi)*\n\n` +
+                    `🆕 *Fitur dibuat:*\n${features.map(f => `• !${f}`).join('\n')}\n\n` +
+                    `${'─'.repeat(28)}\n` +
+                    `💭 *Log pembuatan:*\n\n${payload.thinking}\n\n` +
+                    `${'─'.repeat(28)}\n` +
+                    `📖 *Cara penggunaan:*\n${payload.usage}\n\n` +
+                    `⏳ _Broadcast ke semua grup setelah deploy selesai..._`
+            });
 
-            await sock.sendMessage(groupId, { text: logMsg });
-
-            // Simpan pending broadcast untuk setelah deploy
             if (!global.pendingBroadcast) global.pendingBroadcast = {};
             features.forEach(f => {
                 global.pendingBroadcast[f] = {
-                    features,
-                    usage: payload.usage,
+                    features, usage: payload.usage,
                     requester: payload.requester,
-                    groupId,
-                    timestamp: Date.now()
+                    groupId, timestamp: Date.now()
                 };
             });
-
         } else {
-            // Build gagal — kirim log ke grup
             await sock.sendMessage(groupId, {
                 text:
                     `❌ *Algojo gagal membuat fitur*\n\n` +
@@ -125,7 +116,6 @@ async function handleWebhook(payload, sock, db) {
         }
 
     } else if (type === 'fix_log') {
-        // Log perbaikan ke grup yang request
         await sock.sendMessage(groupId, {
             text:
                 `🔧 *Log perbaikan !${payload.feature}:*\n\n` +
@@ -133,20 +123,51 @@ async function handleWebhook(payload, sock, db) {
                 `⏳ _Broadcast setelah deploy selesai..._`
         });
 
-        // Simpan pending broadcast fix
         if (!global.pendingBroadcast) global.pendingBroadcast = {};
         global.pendingBroadcast[`fix_${payload.feature}`] = {
             isFix: true,
             feature: payload.feature,
-            groupId,
-            timestamp: Date.now()
+            groupId, timestamp: Date.now()
         };
+
+    } else if (type === 'queue_done') {
+        const result = payload.result;
+        if (!result) return;
+
+        if (result.success) {
+            const features = result.features || [];
+            await sock.sendMessage(groupId, {
+                text:
+                    `✅ *Antrian selesai! Fitur siap!*\n\n` +
+                    `🆕 *Fitur:*\n${features.map(f => `• !${f}`).join('\n')}\n\n` +
+                    `🔄 Iterasi: ${result.iterations}x\n\n` +
+                    `📖 *Cara pakai:*\n${result.usage}\n\n` +
+                    `⏳ Deploy 1-2 menit...`
+            });
+
+            if (!global.pendingBroadcast) global.pendingBroadcast = {};
+            features.forEach(f => {
+                global.pendingBroadcast[f] = {
+                    features, usage: result.usage,
+                    requester: result.requester,
+                    groupId, timestamp: Date.now()
+                };
+            });
+        } else {
+            await sock.sendMessage(groupId, {
+                text: `❌ *Antrian selesai tapi gagal.*\n\n${result.message || 'Coba lagi nanti.'}`
+            });
+        }
+
+    } else if (type === 'queue_error') {
+        await sock.sendMessage(groupId, {
+            text: `❌ *Error saat proses antrian:*\n${payload.error}`
+        });
     }
 }
 
 // ══════════════════════════════════════════════════════════════
 // DEPLOY WEBHOOK HANDLER
-// Dipanggil dari Koyeb setelah deploy selesai
 // ══════════════════════════════════════════════════════════════
 async function handleDeployWebhook(sock, db) {
     if (!global.pendingBroadcast) return;
@@ -155,16 +176,13 @@ async function handleDeployWebhook(sock, db) {
     const processed = new Set();
 
     for (const [key, data] of Object.entries(pending)) {
-        // Skip kalau sudah lebih dari 30 menit (kadaluarsa)
         if (Date.now() - data.timestamp > 30 * 60 * 1000) {
-            delete pending[key];
-            continue;
+            delete pending[key]; continue;
         }
 
         if (data.isFix) {
             if (processed.has(`fix_${data.feature}`)) continue;
             processed.add(`fix_${data.feature}`);
-
             await broadcastAll(sock, db,
                 `🔧 *FITUR DIPERBAIKI & SUDAH AKTIF!*\n` +
                 `${'─'.repeat(28)}\n\n` +
@@ -172,14 +190,12 @@ async function handleDeployWebhook(sock, db) {
                 `🤖 *Diperbaiki oleh:* Algojo AI\n\n` +
                 `Coba gunakan sekarang!`
             );
-
         } else {
             const features = data.features || [];
             if (features.some(f => processed.has(f))) continue;
             features.forEach(f => processed.add(f));
 
             const semuaFitur = getAllNemoCommands();
-
             await broadcastAll(sock, db,
                 `🎉 *FITUR BARU SUDAH AKTIF!*\n` +
                 `${'─'.repeat(28)}\n\n` +
@@ -201,7 +217,7 @@ async function handleDeployWebhook(sock, db) {
 // ══════════════════════════════════════════════════════════════
 // MAIN COMMAND HANDLER
 // ══════════════════════════════════════════════════════════════
-module.exports = async (command, args, msg, user, db, sock, m) => {
+const algojoHandler = async (command, args, msg, user, db, sock, m) => {
     if (command !== 'algojo' && command !== 'perbaiki') return;
 
     // ── !perbaiki ─────────────────────────────────────────────
@@ -232,15 +248,10 @@ module.exports = async (command, args, msg, user, db, sock, m) => {
 
         try {
             const result = await apiRequest('/fix', 'POST', {
-                feature,
-                errorLog: autoLog,
-                manualLog,
-                groupId: msg.from
+                feature, errorLog: autoLog, manualLog, groupId: msg.from
             });
-
             if (!result.success) return msg.reply(`❌ Gagal: ${result.message || result.error}`);
             if (global.nemoErrors?.[feature]) delete global.nemoErrors[feature];
-
         } catch(e) {
             await msg.reply(`❌ Error: ${e.message}`);
         }
@@ -284,22 +295,39 @@ module.exports = async (command, args, msg, user, db, sock, m) => {
         return msg.reply(`🔴 *ERROR LOG*\n\n${list}\n\n_!perbaiki <nama> untuk fix_`);
     }
 
-    // Update/force replace fitur yang sudah ada
+    if (subCommand === 'log') {
+        try {
+            const since = parseInt(args[1]) || 0;
+            const result = await apiRequest(`/logs?since=${since}`, 'GET', {});
+            if (!result.logs || result.logs.length === 0) {
+                return msg.reply(
+                    `📋 *Log Algojo*\n\n_Tidak ada log baru_\n\n` +
+                    `${result.processing ? '⚙️ Masih proses...' : '✅ Idle'}`
+                );
+            }
+            const logText = result.logs.slice(-20).join('\n');
+            return msg.reply(
+                `📋 *Log Algojo (${result.total} total)*\n\n` +
+                `\`\`\`\n${logText.slice(0, 3000)}\n\`\`\`\n\n` +
+                `${result.processing ? '⚙️ Masih proses...' : '✅ Selesai'}\n` +
+                `_!algojo log ${result.total} untuk update_`
+            );
+        } catch(e) {
+            return msg.reply(`❌ Gagal ambil log: ${e.message}`);
+        }
+    }
+
     if (subCommand === 'update') {
         const targetFeature = args[1]?.toLowerCase();
         const updatePrompt = args.slice(2).join(' ');
         if (!targetFeature || !updatePrompt) {
             return msg.reply(`Format: \`!algojo update <nama> <deskripsi baru>\``);
         }
-
         await msg.reply(`🔄 *Update fitur !${targetFeature}...*\n\n⏳ Tunggu...`);
-
         try {
             const result = await apiRequest('/build', 'POST', {
-                prompt: updatePrompt,
-                requester: msg.pushName,
-                groupId: msg.from,
-                forceUpdate: true
+                prompt: updatePrompt, requester: msg.pushName,
+                groupId: msg.from, forceUpdate: true
             });
             if (result.queued) return msg.reply(`📬 Antrian ke-${result.position}`);
             if (!result.success) return msg.reply(`❌ ${result.message}`);
@@ -324,6 +352,7 @@ module.exports = async (command, args, msg, user, db, sock, m) => {
             `• \`!algojo list\` — fitur tersedia\n` +
             `• \`!algojo status\` — status & antrian\n` +
             `• \`!algojo errors\` — error log\n` +
+            `• \`!algojo log\` — lihat log pembuatan\n` +
             `• \`!algojo update <nama> <deskripsi>\` — update fitur\n` +
             `• \`!perbaiki <nama>\` — fix bug\n\n` +
             `${getAllNemoCommands().length > 0 ? `📋 *Fitur (${getAllNemoCommands().length}):* ${getAllNemoCommands().join(', ')}` : '_Belum ada fitur_'}`
@@ -342,15 +371,41 @@ module.exports = async (command, args, msg, user, db, sock, m) => {
     await msg.reply(
         `🤖 *Algojo mulai bekerja...*\n\n` +
         `📝 *Request:* _${prompt}_\n\n` +
-        `_Kamu akan dapat update progress di grup ini_ 🔄`
+        `_Update progress akan dikirim tiap 10 detik_ 🔄`
     );
+
+    // Auto-poll log tiap 10 detik
+    let lastLogIndex = 0;
+    const pollInterval = setInterval(async () => {
+        try {
+            const logResult = await apiRequest(`/logs?since=${lastLogIndex}`, 'GET', {});
+            if (logResult.logs && logResult.logs.length > 0) {
+                lastLogIndex = logResult.total;
+                const logText = logResult.logs.slice(-10).join('\n');
+                await sock.sendMessage(msg.from, {
+                    text:
+                        `⚙️ *Algojo sedang kerja...*\n\n` +
+                        `\`\`\`\n${logText.slice(0, 1500)}\n\`\`\`\n\n` +
+                        `_Update berikutnya 10 detik lagi..._`
+                });
+            }
+            if (!logResult.processing) clearInterval(pollInterval);
+        } catch(e) {
+            clearInterval(pollInterval);
+        }
+    }, 10000);
+
+    // Safety: stop setelah 10 menit
+    setTimeout(() => clearInterval(pollInterval), 10 * 60 * 1000);
 
     try {
         const result = await apiRequest('/build', 'POST', {
             prompt,
             requester: msg.pushName || 'Member',
-            groupId: msg.from  // ← kirim groupId ke Railway
+            groupId: msg.from
         });
+
+        clearInterval(pollInterval);
 
         if (result.queued) {
             return msg.reply(
@@ -370,18 +425,24 @@ module.exports = async (command, args, msg, user, db, sock, m) => {
 
         if (!result.success) {
             cooldowns.delete(cooldownKey);
-            return msg.reply(`⚠️ *Gagal:* ${result.message}`);
+            return msg.reply(
+                `⚠️ *Algojo tidak berhasil.*\n\n` +
+                `${result.message || result.error || 'Coba request ulang dengan deskripsi lebih detail!'}`
+            );
         }
 
-        // Berhasil — log sudah dikirim via webhook
-        // Broadcast setelah deploy ditangani oleh handleDeployWebhook
+        // Berhasil — log & broadcast ditangani via webhook
 
     } catch(e) {
+        clearInterval(pollInterval);
         cooldowns.delete(cooldownKey);
         await msg.reply(`❌ Error: ${e.message}`);
     }
 };
 
-// Export handler untuk dipakai di index.js
+// ══════════════════════════════════════════════════════════════
+// EXPORTS
+// ══════════════════════════════════════════════════════════════
+module.exports = algojoHandler;
 module.exports.handleWebhook = handleWebhook;
 module.exports.handleDeployWebhook = handleDeployWebhook;
