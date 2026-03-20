@@ -642,8 +642,21 @@ async function startBot() {
                 .catch(e => console.error('[Berita]', e.message));
             await tiktokCmd(command, args, msg, user, db, sock, m)
                 .catch(e => console.error('[TikTok]', e.message));
-            await utilitasCmd(command, args, msg, user, db, sock, m)
+             await utilitasCmd(command, args, msg, user, db, sock, m)
                 .catch(e => console.error('[Utilitas]', e.message));
+
+            // ── 🤖 ALGOJO AUTO-LOADER ──────────────────────────
+            // Algojo hanya boleh taruh file baru di /commands/nemo/
+            const nemoDir = path.join(__dirname, 'commands', 'nemo');
+            if (!fs.existsSync(nemoDir)) fs.mkdirSync(nemoDir, { recursive: true });
+            const nemoFiles = fs.readdirSync(nemoDir).filter(f => f.endsWith('.js'));
+            for (const file of nemoFiles) {
+                try {
+                    const plugin = require(path.join(nemoDir, file));
+                    await plugin(command, args, msg, user, db, sock, m);
+                } catch(e) { console.error(`[Nemo:${file}]`, e.message); }
+            }
+            // ────────────────────────────────────────────────────
 
         } catch(e) {
             console.error('[Critical Error]', e.message);
