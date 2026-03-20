@@ -407,14 +407,8 @@ const algojoHandler = async (command, args, msg, user, db, sock, m) => {
 
         clearInterval(pollInterval);
 
-        if (result.queued) {
-            return msg.reply(
-                `📬 *Antrian ke-${result.position}*\n\n` +
-                `Estimasi: ~${result.position * 3} menit\n` +
-                `_Update akan dikirim di grup ini_`
-            );
-        }
-
+        // Server selalu balas queued:true sekarang (background job)
+        // Hasil asli akan datang via webhook build_log
         if (result.duplicate) {
             return msg.reply(
                 `⚠️ *Fitur !${result.existingFeature} sudah ada!*\n\n` +
@@ -423,7 +417,7 @@ const algojoHandler = async (command, args, msg, user, db, sock, m) => {
             );
         }
 
-        if (!result.success) {
+        if (!result.queued && !result.success) {
             cooldowns.delete(cooldownKey);
             return msg.reply(
                 `⚠️ *Algojo tidak berhasil.*\n\n` +
@@ -431,7 +425,7 @@ const algojoHandler = async (command, args, msg, user, db, sock, m) => {
             );
         }
 
-        // Berhasil — log & broadcast ditangani via webhook
+        // Kalau queued/success → diam, hasil datang via webhook log
 
     } catch(e) {
         clearInterval(pollInterval);
@@ -445,4 +439,4 @@ const algojoHandler = async (command, args, msg, user, db, sock, m) => {
 // ══════════════════════════════════════════════════════════════
 module.exports = algojoHandler;
 module.exports.handleWebhook = handleWebhook;
-module.exports.handleDeployWebhook = handleDeployWebhook;
+module.exports.handleDeployWebhook = handleDeployWebhook;   
