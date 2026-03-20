@@ -91,6 +91,7 @@ const kalkulatorCmd = require('./commands/kalkulator');
 const beritaCmd     = require('./commands/berita');
 const tiktokCmd     = require('./commands/tiktok');
 const utilitasCmd   = require('./commands/utilitas');
+const algojoRequestCmd = require('./commands/algojo-request');
 
 // ─── CRON (Reminder Scheduler v2.0) ──────────────────────────────────
 let cron;
@@ -644,6 +645,10 @@ async function startBot() {
                 .catch(e => console.error('[TikTok]', e.message));
              await utilitasCmd(command, args, msg, user, db, sock, m)
                 .catch(e => console.error('[Utilitas]', e.message));
+
+            // ── 🤖 ALGOJO REQUEST (WA Bridge) ─────────────────
+            await algojoRequestCmd(command, args, msg, user, db, sock, m)
+                .catch(e => console.error('[AlgojoRequest]', e.message));    
 
             // ── 🤖 ALGOJO AUTO-LOADER ──────────────────────────
             // Algojo hanya boleh taruh file baru di /commands/nemo/

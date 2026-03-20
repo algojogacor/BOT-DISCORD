@@ -9,6 +9,8 @@ module.exports = async (command, args, msg, user) => {
     const sub = (args[0] || '').toLowerCase();
 
     // ── Helpers ────────────────────────────────────────────────────
+    const fs   = require('fs');
+    const path = require('path');
     const bar = (val, len = 10) => {
         const v = Math.min(Math.max(val || 0, 0), 100);
         const fill = Math.round((v / 100) * len);
@@ -61,6 +63,8 @@ module.exports = async (command, args, msg, user) => {
 • !menu game     — Casino, slot, roulette, mines, duel
 • !menu minigame — Catur, Slither, RPG, Akinator, Trivia
 • !menu bola     — Sportsbook: 1X2, HDP, O/U, Mix Parlay
+
+• !menu algojo   — Fitur buatan Algojo AI 🤖: request fitur baru!
 
 🏭 *BISNIS & INDUSTRI*
 • !menu farming  — Pertanian, mesin pabrik, industri bersama
@@ -2213,6 +2217,35 @@ ${'─'.repeat(30)}
 ${'─'.repeat(30)}
 ⚠️ Semua aksi developer bersifat PERMANEN.
    Gunakan dengan sangat bijak dan hati-hati!
+↩️ Balik: *!menu*`
+        );
+    }
+
+    // ── !menu algojo ──────────────────────────────────────
+    if (['algojo', 'nemo', 'ai-fitur', 'fitur-ai'].includes(sub)) {
+        const nemoDir = path.join(__dirname, 'nemo');
+        let nemoList = '';
+        if (fs.existsSync(nemoDir)) {
+            const files = fs.readdirSync(nemoDir).filter(f => f.endsWith('.js'));
+            if (files.length === 0) {
+                nemoList = '_Belum ada fitur buatan Algojo_';
+            } else {
+                nemoList = files.map((f, i) => `${i + 1}. !${f.replace('.js', '')}`).join('\n');
+            }
+        }
+        return msg.reply(
+`🤖 *FITUR BUATAN ALGOJO AI*
+${'━'.repeat(30)}
+
+${nemoList}
+
+${'─'.repeat(30)}
+➕ *Request fitur baru:*
+!algojo buatkan fitur <nama>
+
+📋 *Cek fitur tersedia:*
+!algojo list
+
 ↩️ Balik: *!menu*`
         );
     }
