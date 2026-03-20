@@ -159,6 +159,36 @@ app.get('/', (req, res) => res.json({
 }));
 app.get('/health', (req, res) => res.send('OK'));
 
+const { handleWebhook, handleDeployWebhook } = require('./commands/algojo-request');
+ 
+// ── Webhook dari Railway (build/fix log + thinking) ──────────
+app.post('/webhook/algojo', async (req, res) => {
+    const key = req.headers['x-webhook-key'];
+    if (key !== (process.env.BOT_WEBHOOK_KEY || 'rahasia123')) {
+        return res.status(401).json({ error: 'Unauthorized' });
+    }
+    res.sendStatus(200);
+    try {
+        await handleWebhook(req.body, global.sock, global.db);
+    } catch(e) {
+        console.error('[Webhook Algojo]', e.message);
+    }
+});
+ 
+// ── Webhook dari Koyeb (setelah deploy selesai) ──────────────
+app.post('/webhook/deploy', async (req, res) => {
+    const key = req.headers['x-webhook-key'];
+    if (key !== (process.env.BOT_WEBHOOK_KEY || 'rahasia123')) {
+        return res.status(401).json({ error: 'Unauthorized' });
+    }
+    res.sendStatus(200);
+    try {
+        await handleDeployWebhook(global.sock, global.db);
+    } catch(e) {
+        console.error('[Webhook Deploy]', e.message);
+    }
+});
+
 // ── Algojo Deploy Webhook ─────────────────────────────────
 app.post('/webhook/deploy', async (req, res) => {
     res.sendStatus(200);
