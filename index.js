@@ -189,27 +189,6 @@ app.post('/webhook/deploy', async (req, res) => {
     }
 });
 
-// ── Algojo Deploy Webhook ─────────────────────────────────
-app.post('/webhook/deploy', async (req, res) => {
-    res.sendStatus(200);
-    const { feature, requester } = req.body;
-    if (!feature || !global.sock) return;
-    const groups = Object.keys(global.db?.groups || {});
-    const broadcastMsg =
-        `🎉 *FITUR BARU SUDAH AKTIF!*\n` +
-        `${'─'.repeat(28)}\n\n` +
-        `✨ *Perintah:* !${feature}\n` +
-        `👤 *Request oleh:* ${requester || 'Member'}\n\n` +
-        `Ketik *!${feature}* untuk mencoba sekarang!\n\n` +
-        `_Dibuat otomatis oleh Algojo AI_ 🤖`;
-    for (const groupId of groups) {
-        try {
-            await global.sock.sendMessage(groupId, { text: broadcastMsg });
-            await new Promise(r => setTimeout(r, 1500));
-        } catch(e) { console.error('[Webhook]', e.message); }
-    }
-});
-
 app.listen(port, () => console.log(`🌐 Server jalan di port ${port}`));
 
 // ══════════════════════════════════════════════════════════════════════
@@ -731,9 +710,17 @@ for (const file of nemoFiles) {
             msg: e.message,
             cmd: command
         });
-        // Simpan maksimal 10 error terakhir
         if (global.nemoErrors[featureName].length > 10) {
             global.nemoErrors[featureName].shift();
+        }
+
+        // Kasih tau user kalau command yang dia ketik error
+        if (command === featureName) {
+            await msg.reply(
+                `⚠️ *Fitur !${featureName} sedang error*\n\n` +
+                `\`${e.message.slice(0, 100)}\`\n\n` +
+                `_Ketik !perbaiki ${featureName} untuk auto-fix_`
+            ).catch(() => {});
         }
     }
 }
