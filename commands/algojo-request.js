@@ -439,4 +439,4 @@ const algojoHandler = async (command, args, msg, user, db, sock, m) => {
 // ══════════════════════════════════════════════════════════════
 module.exports = algojoHandler;
 module.exports.handleWebhook = handleWebhook;
-module.exports.handleDeployWebhook = handleDeployWebhook;   
+module.exports.handleDeployWebhook = handleDeployWebhook;
