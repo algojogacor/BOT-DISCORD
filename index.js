@@ -673,17 +673,41 @@ async function startBot() {
             await algojoRequestCmd(command, args, msg, user, db, sock, m)
                 .catch(e => console.error('[AlgojoRequest]', e.message));    
 
-            // ── 🤖 ALGOJO AUTO-LOADER ──────────────────────────
-            // Algojo hanya boleh taruh file baru di /commands/nemo/
-            const nemoDir = path.join(__dirname, 'commands', 'nemo');
-            if (!fs.existsSync(nemoDir)) fs.mkdirSync(nemoDir, { recursive: true });
-            const nemoFiles = fs.readdirSync(nemoDir).filter(f => f.endsWith('.js'));
-            for (const file of nemoFiles) {
-                try {
-                    const plugin = require(path.join(nemoDir, file));
-                    await plugin(command, args, msg, user, db, sock, m);
-                } catch(e) { console.error(`[Nemo:${file}]`, e.message); }
-            }
+            // ── 🤖 ALGOJO AUTO-LOADER v2 ───────────────────────────────
+// Taruh ini di index.js menggantikan auto-loader yang lama
+// Algojo hanya boleh taruh file baru di /commands/nemo/
+
+if (!global.nemoErrors) global.nemoErrors = {};
+
+const nemoDir = path.join(__dirname, 'commands', 'nemo');
+if (!fs.existsSync(nemoDir)) fs.mkdirSync(nemoDir, { recursive: true });
+const nemoFiles = fs.readdirSync(nemoDir).filter(f => f.endsWith('.js'));
+
+for (const file of nemoFiles) {
+    try {
+        // Hapus cache agar selalu load versi terbaru
+        const fullPath = path.join(nemoDir, file);
+        delete require.cache[require.resolve(fullPath)];
+        const plugin = require(fullPath);
+        await plugin(command, args, msg, user, db, sock, m);
+    } catch(e) {
+        const featureName = file.replace('.js', '');
+        console.error(`[Nemo:${file}]`, e.message);
+
+        // Simpan error log untuk !perbaiki
+        if (!global.nemoErrors[featureName]) global.nemoErrors[featureName] = [];
+        global.nemoErrors[featureName].push({
+            time: new Date().toLocaleTimeString('id-ID', { timeZone: 'Asia/Jakarta' }),
+            msg: e.message,
+            cmd: command
+        });
+        // Simpan maksimal 10 error terakhir
+        if (global.nemoErrors[featureName].length > 10) {
+            global.nemoErrors[featureName].shift();
+        }
+    }
+}
+// ─────────────────────────────────────────────────────────────
             // ────────────────────────────────────────────────────
 
         } catch(e) {
