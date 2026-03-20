@@ -159,6 +159,27 @@ app.get('/', (req, res) => res.json({
 }));
 app.get('/health', (req, res) => res.send('OK'));
 
+// ── Algojo Deploy Webhook ─────────────────────────────────
+app.post('/webhook/deploy', async (req, res) => {
+    res.sendStatus(200);
+    const { feature, requester } = req.body;
+    if (!feature || !global.sock) return;
+    const groups = Object.keys(global.db?.groups || {});
+    const broadcastMsg =
+        `🎉 *FITUR BARU SUDAH AKTIF!*\n` +
+        `${'─'.repeat(28)}\n\n` +
+        `✨ *Perintah:* !${feature}\n` +
+        `👤 *Request oleh:* ${requester || 'Member'}\n\n` +
+        `Ketik *!${feature}* untuk mencoba sekarang!\n\n` +
+        `_Dibuat otomatis oleh Algojo AI_ 🤖`;
+    for (const groupId of groups) {
+        try {
+            await global.sock.sendMessage(groupId, { text: broadcastMsg });
+            await new Promise(r => setTimeout(r, 1500));
+        } catch(e) { console.error('[Webhook]', e.message); }
+    }
+});
+
 app.listen(port, () => console.log(`🌐 Server jalan di port ${port}`));
 
 // ══════════════════════════════════════════════════════════════════════
@@ -248,6 +269,8 @@ async function startBot() {
         retryRequestDelayMs: 5000, syncFullHistory: false,
         generateHighQualityLinkPreview: true,
     });
+
+    global.sock = sock; // ← tambah ini
 
     // ── Connection Update ──────────────────────────────────────
     sock.ev.on('connection.update', async (update) => {
