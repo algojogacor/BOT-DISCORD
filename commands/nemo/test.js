@@ -11,5 +11,3 @@ module.exports = async (command, args, msg, user, db, sock, m) => {
     }
     await msg.reply(hasil);
 };
-
-{"status":"done","files":["commands/nemo/test.js"],"usage":"!test [nama]"}
