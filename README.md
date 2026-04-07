@@ -138,6 +138,7 @@ Buka WhatsApp > Perangkat Tertaut > Tautkan Perangkat > Scan QR
 | `!setrules <aturan>` | Set peraturan grup |
 | `!rules` | Lihat peraturan grup |
 | `!listadmin` | Daftar admin grup |
+| `!idgrup` | Melihat ID dari grup saat ini |
 
 ### 🔢 Kalkulator & Konversi
 | Perintah | Fungsi |
@@ -219,6 +220,7 @@ Buka WhatsApp > Perangkat Tertaut > Tautkan Perangkat > Scan QR
 | `PORT` | ❌ | Port server (default: 3000) |
 | `REMOVE_BG_API_KEY` | ❌ | Untuk fitur !bg |
 | `NODE_ENV` | ❌ | development/production |
+| `ALLOWED_GROUPS` | ❌ | ID grup yang diizinkan, dipisah koma |
 
 ---
 
