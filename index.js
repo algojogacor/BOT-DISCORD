@@ -279,7 +279,7 @@ async function startBot() {
         generateHighQualityLinkPreview: true,
     });
 
-    global.sock = sock; // ← tambah ini
+    global.sock = sock;
 
     // ── Connection Update ──────────────────────────────────────
     sock.ev.on('connection.update', async (update) => {
@@ -335,6 +335,9 @@ async function startBot() {
         const m = messages[0];
         if (!m.message) return;
 
+        // Abaikan pesan dari bot sendiri
+        if (m.key.fromMe) return;
+
         try {
             const remoteJid = m.key.remoteJid;
             const isGroup   = remoteJid.endsWith('@g.us');
@@ -345,6 +348,13 @@ async function startBot() {
                            || m.message.extendedTextMessage?.text
                            || m.message.imageMessage?.caption
                            || m.message.videoMessage?.caption || '';
+
+            // ══════════════════════════════════════════════════
+            // 📋 LOG ID GRUP — tampil di Koyeb setiap ada pesan masuk
+            // ══════════════════════════════════════════════════
+            if (isGroup && body) {
+                console.log(`[GROUP LOG] ID: ${remoteJid} | Nama: ${pushName} | Pesan: ${body.slice(0, 30)}`);
+            }
 
             // AdminAbuse Interactive
             if (isGroup && global.abuseState?.active) {
@@ -558,15 +568,10 @@ async function startBot() {
             // ══════════════════════════════════════════════════
 
             // ── 🫀 LIFE SYSTEM  ───────────────────────
-            // Commands: me, status, profile, makan, tidur, bangun,
-            //           revive, rs, matistatus, hidupstatus
             await lifeCmd(command, args, msg, user, db, sock)
                 .catch(e => console.error('[Life]', e.message));
 
             // ── 🏦 EKONOMI  ───────────────────────────
-            // Commands: bank, atm, dompet, depo, deposit, tarik,
-            //           withdraw, transfer, tf, pinjam, loan,
-            //           bayar, pay, rob, maling, top, leaderboard
             await bankCmd(command, args, msg, user, db, sock)
                 .catch(e => console.error('[Bank]', e.message));
 
@@ -583,7 +588,7 @@ async function startBot() {
                 .catch(e => console.error('[Dev]', e.message));
             await pabrikCommand(command, args, msg, user, db, sock)
                 .catch(e => console.error('[Pabrik]', e.message));
-                await templeCmd(command, args, msg, user, db)
+            await templeCmd(command, args, msg, user, db)
                 .catch(e => console.error('[Temple]', e.message));
             await chartCmd(command, args, msg, user, db, sock)
                 .catch(e => console.error('[Chart]', e.message));
@@ -595,12 +600,12 @@ async function startBot() {
                 .catch(e => console.error('[Property]', e.message));
             await minesCmd(command, args, msg, user, db)
                 .catch(e => console.error('[Mines]', e.message));
-                await handleWALinkVerify(command, args, msg, db)
+            await handleWALinkVerify(command, args, msg, db)
                 .catch(e => console.error('[LinkDC]', e.message));
             await miningCmd(command, args, msg, user, db, sock)
                 .catch(e => console.error('[Mining]', e.message));
-                await summarizeDocCmd(command, args, msg, user, db, sock, m)
-    .catch(e => console.error('[SummarizeDoc]', e.message));
+            await summarizeDocCmd(command, args, msg, user, db, sock, m)
+                .catch(e => console.error('[SummarizeDoc]', e.message));
             await duelCmd(command, args, msg, user, db)
                 .catch(e => console.error('[Duel]', e.message));
             await bolaCmd(command, args, msg, user, db, sender)
@@ -617,7 +622,7 @@ async function startBot() {
                 .catch(e => console.error('[Roulette]', e.message));
             await battleCmd(command, args, msg, user, db)
                 .catch(e => console.error('[Battle]', e.message));
-                await neonSkyCmd(command, args, msg, user, db)
+            await neonSkyCmd(command, args, msg, user, db)
                 .catch(e => console.error('[NeonSky]', e.message));
             await ttsCmd(command, args, msg)
                 .catch(e => console.error('[TTS]', e.message));
@@ -675,7 +680,7 @@ async function startBot() {
                 .catch(e => console.error('[Berita]', e.message));
             await tiktokCmd(command, args, msg, user, db, sock, m)
                 .catch(e => console.error('[TikTok]', e.message));
-             await utilitasCmd(command, args, msg, user, db, sock, m)
+            await utilitasCmd(command, args, msg, user, db, sock, m)
                 .catch(e => console.error('[Utilitas]', e.message));
 
             // ── 🤖 ALGOJO REQUEST (WA Bridge) ─────────────────
@@ -683,49 +688,42 @@ async function startBot() {
                 .catch(e => console.error('[AlgojoRequest]', e.message));    
 
             // ── 🤖 ALGOJO AUTO-LOADER v2 ───────────────────────────────
-// Taruh ini di index.js menggantikan auto-loader yang lama
-// Algojo hanya boleh taruh file baru di /commands/nemo/
+            if (!global.nemoErrors) global.nemoErrors = {};
 
-if (!global.nemoErrors) global.nemoErrors = {};
+            const nemoDir = path.join(__dirname, 'commands', 'nemo');
+            if (!fs.existsSync(nemoDir)) fs.mkdirSync(nemoDir, { recursive: true });
+            const nemoFiles = fs.readdirSync(nemoDir).filter(f => f.endsWith('.js'));
 
-const nemoDir = path.join(__dirname, 'commands', 'nemo');
-if (!fs.existsSync(nemoDir)) fs.mkdirSync(nemoDir, { recursive: true });
-const nemoFiles = fs.readdirSync(nemoDir).filter(f => f.endsWith('.js'));
+            for (const file of nemoFiles) {
+                try {
+                    const fullPath = path.join(nemoDir, file);
+                    delete require.cache[require.resolve(fullPath)];
+                    const plugin = require(fullPath);
+                    await plugin(command, args, msg, user, db, sock, m);
+                } catch(e) {
+                    const featureName = file.replace('.js', '');
+                    console.error(`[Nemo:${file}]`, e.message);
 
-for (const file of nemoFiles) {
-    try {
-        // Hapus cache agar selalu load versi terbaru
-        const fullPath = path.join(nemoDir, file);
-        delete require.cache[require.resolve(fullPath)];
-        const plugin = require(fullPath);
-        await plugin(command, args, msg, user, db, sock, m);
-    } catch(e) {
-        const featureName = file.replace('.js', '');
-        console.error(`[Nemo:${file}]`, e.message);
+                    if (!global.nemoErrors[featureName]) global.nemoErrors[featureName] = [];
+                    global.nemoErrors[featureName].push({
+                        time: new Date().toLocaleTimeString('id-ID', { timeZone: 'Asia/Jakarta' }),
+                        msg: e.message,
+                        cmd: command
+                    });
+                    if (global.nemoErrors[featureName].length > 10) {
+                        global.nemoErrors[featureName].shift();
+                    }
 
-        // Simpan error log untuk !perbaiki
-        if (!global.nemoErrors[featureName]) global.nemoErrors[featureName] = [];
-        global.nemoErrors[featureName].push({
-            time: new Date().toLocaleTimeString('id-ID', { timeZone: 'Asia/Jakarta' }),
-            msg: e.message,
-            cmd: command
-        });
-        if (global.nemoErrors[featureName].length > 10) {
-            global.nemoErrors[featureName].shift();
-        }
-
-        // Kasih tau user kalau command yang dia ketik error
-        if (command === featureName) {
-            await msg.reply(
-                `⚠️ *Fitur !${featureName} sedang error*\n\n` +
-                `\`${e.message.slice(0, 100)}\`\n\n` +
-                `_Ketik !perbaiki ${featureName} untuk auto-fix_`
-            ).catch(() => {});
-        }
-    }
-}
-// ─────────────────────────────────────────────────────────────
-            
+                    if (command === featureName) {
+                        await msg.reply(
+                            `⚠️ *Fitur !${featureName} sedang error*\n\n` +
+                            `\`${e.message.slice(0, 100)}\`\n\n` +
+                            `_Ketik !perbaiki ${featureName} untuk auto-fix_`
+                        ).catch(() => {});
+                    }
+                }
+            }
+            // ─────────────────────────────────────────────────────────────
 
         } catch(e) {
             console.error('[Critical Error]', e.message);
