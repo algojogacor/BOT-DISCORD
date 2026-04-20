@@ -1,12 +1,18 @@
 require('dotenv').config();
 const { MongoClient } = require('mongodb');
 
-const uri = process.env.MONGODB_URI; 
+const uri = process.env.MONGODB_URI;
+
+// ✅ UPGRADE v2.1: Optimized connection pooling
 const client = new MongoClient(uri, {
-    connectTimeoutMS: 10000, // Turunkan ke 10 detik agar cepat fail-over
+    connectTimeoutMS: 10000,
     socketTimeoutMS: 45000,
-    maxPoolSize: 10,         // Batasi koneksi agar tidak spamming ke Atlas
+    maxPoolSize: 50,              // ✅ Increased from 10 to 50
+    minPoolSize: 10,              // ✅ NEW: Maintain min connections
+    maxIdleTimeMS: 60000,         // ✅ NEW: Close idle after 1 min
+    waitQueueTimeoutMS: 5000,     // ✅ NEW: Fail fast if pool full
     serverSelectionTimeoutMS: 5000,
+    heartbeatFrequencyMS: 10000,  // ✅ NEW: Faster failure detection
 });
 
 let dbCollection = null;
@@ -17,7 +23,9 @@ let localData = {
     groups: {}, 
     chatLogs: {},
     market: { commodities: {} }, 
-    settings: {} 
+    settings: {},
+    reminders: {},
+    analytics: { commands: {}, totalMessages: 0 }
 };
 
 // ============================================================
@@ -40,7 +48,6 @@ async function connectToCloud() {
         return dbCollection;
     } catch (err) {
         console.error("❌ Gagal Konek MongoDB:", err.message);
-        // Jangan return null, biarkan error agar index.js tau kalau DB mati
         throw err; 
     }
 }
@@ -55,13 +62,13 @@ async function loadFromCloud() {
         const result = await dbCollection.findOne({ _id: 'main_data' }); 
         
         if (result && result.data) {
-            // MERGE DATA: Agar jika ada properti baru di localData tidak hilang tertimpa
             localData = { ...localData, ...result.data };
             
-            // FIX: Pastikan array/object penting tidak undefined
             if (!localData.users) localData.users = {};
             if (!localData.groups) localData.groups = {};
             if (!localData.chatLogs) localData.chatLogs = {};
+            if (!localData.reminders) localData.reminders = {};
+            if (!localData.analytics) localData.analytics = { commands: {}, totalMessages: 0 };
             
             console.log(`📥 Data dimuat: ${Object.keys(localData.users).length} users.`);
         } else {
@@ -76,7 +83,6 @@ async function loadFromCloud() {
 
 // Wrapper
 const loadDB = async () => {
-    // Cek apakah data user kosong, jika iya paksa load dari cloud
     if (!localData.users || Object.keys(localData.users).length === 0) {
         return await loadFromCloud();
     }
@@ -84,36 +90,64 @@ const loadDB = async () => {
 };
 
 // ============================================================
-// 3. SAVE DATA (THROTTLING / ANTI-SPAM)
+// 3. SAVE DATA (THROTTLING / ANTI-SPAM) - ✅ UPGRADED
 // ============================================================
-// Kita buat variabel status agar tidak double save
 let isSaving = false;
+let saveQueue = []; // ✅ NEW: Queue for batch saves
+const SAVE_INTERVAL_MS = 3000; // ✅ NEW: Batch every 3 seconds
 
-const saveDB = async (data) => {
-    if (isSaving) return; // Jika sedang saving, skip request ini (mencegah lag)
+// ✅ UPGRADE: Process save queue periodically
+async function processSaveQueue() {
+    if (isSaving || saveQueue.length === 0) return;
+    
+    isSaving = true;
+    const pendingSaves = [...saveQueue];
+    saveQueue = [];
     
     try {
-        isSaving = true;
-        if (data) localData = data; 
-
         if (!dbCollection) {
             await connectToCloud();
         }
 
-        // HANYA UPDATE FIELD 'data'
+        // Merge all pending saves
+        let mergedData = { ...localData };
+        for (const update of pendingSaves) {
+            mergedData = { ...mergedData, ...update };
+        }
+        localData = mergedData;
+
         await dbCollection.updateOne(
             { _id: 'main_data' }, 
             { $set: { data: localData } }, 
             { upsert: true } 
         );
         
-       // console.log("💾 Data saved to Cloud");
-
     } catch (err) {
         console.error("⚠️ Gagal Save ke MongoDB:", err.message);
+        // Re-queue failed saves
+        saveQueue = [...pendingSaves, ...saveQueue];
     } finally {
-        isSaving = false; // Buka kunci saving
+        isSaving = false;
     }
+}
+
+// ✅ UPGRADE: Process queue every 3 seconds
+setInterval(processSaveQueue, SAVE_INTERVAL_MS);
+
+const saveDB = async (data) => {
+    if (data) {
+        // ✅ UPGRADE: Queue instead of immediate save
+        saveQueue.push(data);
+    } else if (!isSaving) {
+        // Force immediate save if no data provided
+        await processSaveQueue();
+    }
+};
+
+// ✅ UPGRADE: Force save all pending (for shutdown)
+const forceSaveDB = async (data) => {
+    if (data) localData = data;
+    await processSaveQueue();
 };
 
 // ============================================================
@@ -122,12 +156,10 @@ const saveDB = async (data) => {
 const addQuestProgress = (user, questId) => {
     if (!user.quest || !user.quest.daily) return null;
     
-    // Cari quest by reference
     const quest = user.quest.daily.find(q => q.id === questId);
     
     if (quest && !quest.claimed && quest.progress < quest.target) {
         quest.progress++;
-       
         
         if (quest.progress >= quest.target) {
             return `🎉 Quest *${quest.name}* Selesai! Ketik !daily klaim.`;
@@ -136,5 +168,5 @@ const addQuestProgress = (user, questId) => {
     return null;
 };
 
-module.exports = { connectToCloud, loadDB, saveDB, addQuestProgress };
-
+// ✅ UPGRADE: Export force save for graceful shutdown
+module.exports = { connectToCloud, loadDB, saveDB, forceSaveDB, addQuestProgress };
